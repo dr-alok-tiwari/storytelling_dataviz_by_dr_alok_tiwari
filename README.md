@@ -1,5 +1,5 @@
 # 📊 Storytelling using Data Visualization
-### Interactive Teaching App — PGDM-BDA Term 1
+### Interactive Teaching App
 **Goa Institute of Management | Dr. Alok Tiwari**
 
 ---
