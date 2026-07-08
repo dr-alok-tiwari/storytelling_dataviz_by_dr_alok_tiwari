@@ -4,6 +4,51 @@ Reusable UI components, CSS injection, and callout boxes.
 """
 import streamlit as st
 
+# ── MCQ radio behaviour ─────────────────────────────────────────────────────
+# Streamlit radio widgets normally preselect the first option when index=0.
+# Several quiz/activity MCQs in this app pass index=0, so we centrally keep
+# only assessment-style radios blank by default while preserving normal chart
+# control radios such as chart type, color mode, and dashboard settings.
+_ORIGINAL_ST_RADIO = st.radio
+
+
+def _has_numeric_suffix(value: str, prefix: str) -> bool:
+    return value.startswith(prefix) and value[len(prefix):].isdigit()
+
+
+def _is_assessment_radio(label, key) -> bool:
+    key_s = "" if key is None else str(key)
+    label_s = "" if label is None else str(label).strip().lower()
+
+    if key_s.startswith("quiz_") or key_s.startswith("qz_q"):
+        return True
+
+    if key_s in {"s1_demo_q", "s1_gap"}:
+        return True
+
+    numeric_mcq_prefixes = (
+        "s2_lab_",
+        "s3_scale_",
+        "s4_pal_",
+        "s6_dist_",
+        "s7_pie_",
+    )
+    if any(_has_numeric_suffix(key_s, prefix) for prefix in numeric_mcq_prefixes):
+        return True
+
+    return label_s in {"select your answer", "select your answer:"}
+
+
+def _radio_with_blank_assessment_default(label, options, *args, **kwargs):
+    if _is_assessment_radio(label, kwargs.get("key")) and kwargs.get("index", 0) == 0:
+        kwargs["index"] = None
+    return _ORIGINAL_ST_RADIO(label, options, *args, **kwargs)
+
+
+if getattr(st.radio, "__name__", "") != "_radio_with_blank_assessment_default":
+    st.radio = _radio_with_blank_assessment_default
+
+
 # ── Colour palette ────────────────────────────────────────────────────────────
 PRIMARY   = "#1B4F8A"   # GIM deep blue
 ACCENT    = "#F4A900"   # Gold
@@ -179,21 +224,26 @@ def inject_css():
 
 # ── Callout helpers ────────────────────────────────────────────────────────────
 
+
 def callout_insight(body: str, label: str = "Key Insight"):
     st.markdown(f'<div class="callout-insight"><strong>💡 {label}</strong>{body}</div>',
                 unsafe_allow_html=True)
+
 
 def callout_manager(body: str, label: str = "Managerial Meaning"):
     st.markdown(f'<div class="callout-manager"><strong>📊 {label}</strong>{body}</div>',
                 unsafe_allow_html=True)
 
+
 def callout_mistake(body: str, label: str = "Common Mistake"):
     st.markdown(f'<div class="callout-mistake"><strong>⚠️ {label}</strong>{body}</div>',
                 unsafe_allow_html=True)
 
+
 def callout_action(body: str, label: str = "Action Recommendation"):
     st.markdown(f'<div class="callout-action"><strong>🎯 {label}</strong>{body}</div>',
                 unsafe_allow_html=True)
+
 
 def hero(title: str, subtitle: str = ""):
     st.markdown(f"""
@@ -201,6 +251,7 @@ def hero(title: str, subtitle: str = ""):
         <h1>{title}</h1>
         {"<p>" + subtitle + "</p>" if subtitle else ""}
     </div>""", unsafe_allow_html=True)
+
 
 def session_header(n: int):
     mod = SESSION_MODULE[n]
@@ -215,11 +266,13 @@ def session_header(n: int):
     </h2>
     """, unsafe_allow_html=True)
 
+
 def reflection_box(prompt: str, key: str):
     st.markdown("---")
     st.markdown("### 🪞 Reflection")
     st.markdown(f"*{prompt}*")
     st.text_area("Your reflection (not submitted — for personal note-taking):", key=key, height=80)
+
 
 def footer():
     st.markdown(
