@@ -5,6 +5,7 @@ Interactive Teaching App · Dr. Alok Tiwari
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="DataViz Storytelling | GIM BDA",
@@ -29,6 +30,48 @@ from modules.tools import (
 )
 
 inject_css()
+
+
+def scroll_to_top():
+    """Reset the browser viewport to the top when a new app page is opened."""
+    components.html(
+        """
+        <script>
+        (function () {
+            const doc = window.parent.document;
+            const selectors = [
+                "html",
+                "body",
+                "section.main",
+                "div[data-testid='stAppViewContainer']",
+                "div[data-testid='stMain']",
+                "div[data-testid='stMainBlockContainer']"
+            ];
+
+            function topNow() {
+                try {
+                    window.parent.scrollTo(0, 0);
+                    selectors.forEach((selector) => {
+                        const el = doc.querySelector(selector);
+                        if (el) {
+                            el.scrollTop = 0;
+                        }
+                    });
+                } catch (err) {
+                    // Fail silently: this is a visual enhancement only.
+                }
+            }
+
+            topNow();
+            setTimeout(topNow, 50);
+            setTimeout(topNow, 150);
+            setTimeout(topNow, 300);
+        })();
+        </script>
+        """,
+        height=0,
+        width=0,
+    )
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  SIDEBAR CSS  — pure st.button styling, no overlay tricks
@@ -94,7 +137,7 @@ section[data-testid="stSidebar"] p.mod-label {
     margin: 0 !important;
 }
 
-/* ── Divider ──────────────────────────────────────────── */
+/* ── Divider ─────────────────────────────────────────── */
 section[data-testid="stSidebar"] hr {
     border-color: rgba(255,255,255,0.08) !important;
     margin: 8px 0 !important;
@@ -113,6 +156,12 @@ if "completed" not in st.session_state:
     st.session_state.completed = {i: False for i in range(1, 17)}
 if "page" not in st.session_state:
     st.session_state.page = "Home"
+if "_last_rendered_page" not in st.session_state:
+    st.session_state._last_rendered_page = st.session_state.page
+
+if st.session_state.page != st.session_state._last_rendered_page:
+    st.session_state._last_rendered_page = st.session_state.page
+    scroll_to_top()
 
 # ── Nav data ──────────────────────────────────────────────────────────────────
 MODULES = [
