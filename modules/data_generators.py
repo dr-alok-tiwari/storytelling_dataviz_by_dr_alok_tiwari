@@ -91,20 +91,25 @@ def financial_expenses():
 
 def healthcare_patient_flow():
     n = 300
-    hours = rng.choice(range(24), n, p=np.array([
+    # Keep realistic hourly demand while guaranteeing the probability vector is
+    # mathematically valid. The original weights summed to 1.05, which caused
+    # numpy.random.Generator.choice to raise a ValueError at runtime.
+    hour_weights = np.array([
         0.01, 0.01, 0.01, 0.01, 0.01, 0.02, 0.04, 0.07, 0.09,
         0.08, 0.07, 0.06, 0.06, 0.06, 0.06, 0.07, 0.07, 0.06,
         0.05, 0.04, 0.04, 0.03, 0.02, 0.01
-    ]))
+    ], dtype=float)
+    hour_weights /= hour_weights.sum()
+    hours = rng.choice(np.arange(24), n, p=hour_weights)
     departments = rng.choice(["Emergency", "OPD", "ICU", "Surgery", "Radiology"], n,
-                              p=[0.35, 0.30, 0.12, 0.13, 0.10])
+                             p=[0.35, 0.30, 0.12, 0.13, 0.10])
     wait = np.where(departments == "Emergency",
                     rng.exponential(20, n).clip(5, 120),
                     rng.exponential(35, n).clip(5, 180))
     return pd.DataFrame({"hour": hours, "department": departments,
                          "wait_minutes": wait.round(1),
                          "severity": rng.choice(["Low", "Medium", "High", "Critical"], n,
-                                                  p=[0.4, 0.35, 0.18, 0.07])})
+                                                p=[0.4, 0.35, 0.18, 0.07])})
 
 
 def bed_occupancy():
