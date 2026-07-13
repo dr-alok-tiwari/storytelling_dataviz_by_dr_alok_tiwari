@@ -33,7 +33,7 @@ jobs:
         run: python -m compileall -q app.py modules tests
 
       - name: Lint production shell
-        run: ruff check app.py modules/data_generators.py modules/home.py modules/tools.py modules/ui_components.py tests --ignore E402,F401
+        run: ruff check app.py modules/data_generators.py modules/home.py modules/tools.py modules/tools_runtime_patch.py modules/ui_components.py tests --ignore E402,F401
 
       - name: Test
         run: pytest
