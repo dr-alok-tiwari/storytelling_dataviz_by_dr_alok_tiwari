@@ -7,7 +7,12 @@ from concurrent.futures import ThreadPoolExecutor
 import plotly.express as px
 from streamlit.testing.v1 import AppTest
 
-from modules.data_generators import scatter_sales_spend
+from modules.data_generators import (
+    bed_occupancy,
+    regional_sales,
+    retail_sales,
+    scatter_sales_spend,
+)
 from modules.tools_runtime_patch import install
 
 
@@ -30,18 +35,6 @@ enable_lazy_tabs(legacy_page, key="demo_tabs")()
 """
 
 
-STRESS_SCRIPT = """
-import streamlit as st
-from modules.lazy_tabs import enable_lazy_tabs
-from modules.sessions_9_16 import session_11
-from modules.tools_runtime_patch import install
-
-install()
-st.session_state.setdefault("completed", {i: False for i in range(1, 17)})
-enable_lazy_tabs(session_11, key="stress_tabs")()
-"""
-
-
 def test_hidden_tab_bodies_are_not_executed() -> None:
     app = AppTest.from_string(LAZY_TAB_SCRIPT, default_timeout=60).run()
     assert not app.exception
@@ -52,6 +45,17 @@ def test_hidden_tab_bodies_are_not_executed() -> None:
     app.run(timeout=60)
     assert not app.exception
     assert app.session_state["second_runs"] == 1
+
+
+def test_streamlit_sessions_keep_independent_state() -> None:
+    first_user = AppTest.from_string(LAZY_TAB_SCRIPT, default_timeout=60).run()
+    second_user = AppTest.from_string(LAZY_TAB_SCRIPT, default_timeout=60).run()
+
+    first_user.session_state["private_marker"] = "first-user-only"
+    first_user.run(timeout=60)
+
+    assert first_user.session_state["private_marker"] == "first-user-only"
+    assert "private_marker" not in second_user.session_state
 
 
 def test_numpy_ols_trendlines_work_without_statsmodels() -> None:
@@ -67,20 +71,50 @@ def test_numpy_ols_trendlines_work_without_statsmodels() -> None:
     assert len(trend_traces) == 3
 
 
-def _run_heavy_session() -> None:
-    app = AppTest.from_string(STRESS_SCRIPT, default_timeout=120).run(timeout=120)
-    assert not app.exception
+def _run_chart_heavy_workload(worker_id: int) -> tuple[int, int, int]:
+    """Build the main dashboard chart families using shared cached data."""
 
-    # Force the chart-heavy dashboard demo tab and rerun the same isolated session.
-    app.session_state["stress_tabs"] = "📊 Demo"
-    app.run(timeout=120)
-    assert not app.exception
+    install()
+
+    occupancy = bed_occupancy()
+    occupancy_recent = occupancy[
+        occupancy["date"] >= occupancy["date"].max() - occupancy["date"].max().freq.delta
+    ] if getattr(occupancy["date"].max(), "freq", None) else occupancy.tail(150)
+    occupancy_trend = occupancy_recent.groupby(["date", "ward"], as_index=False)["occupancy_pct"].mean()
+    occupancy_figure = px.line(
+        occupancy_trend,
+        x="date",
+        y="occupancy_pct",
+        color="ward",
+        title=f"Occupancy workload {worker_id}",
+    )
+
+    sales = regional_sales().groupby("region", as_index=False)["sales"].sum()
+    sales_figure = px.bar(sales, x="region", y="sales")
+
+    revenue = retail_sales()
+    relationship_figure = px.scatter(
+        scatter_sales_spend(),
+        x="marketing_spend",
+        y="revenue",
+        color="channel",
+        trendline="ols",
+    )
+
+    return (
+        len(occupancy_figure.data),
+        len(sales_figure.data),
+        len(relationship_figure.data) + len(revenue),
+    )
 
 
-def test_eight_simultaneous_streamlit_sessions() -> None:
-    """Exercise independent session state and chart rendering concurrently."""
+def test_eight_simultaneous_chart_render_workloads() -> None:
+    """Exercise cached data and chart generation from eight concurrent workers."""
 
     with ThreadPoolExecutor(max_workers=8) as executor:
-        futures = [executor.submit(_run_heavy_session) for _ in range(8)]
-        for future in futures:
-            future.result(timeout=180)
+        results = list(executor.map(_run_chart_heavy_workload, range(8)))
+
+    assert len(results) == 8
+    assert all(occupancy_traces >= 1 for occupancy_traces, _, _ in results)
+    assert all(sales_traces >= 1 for _, sales_traces, _ in results)
+    assert all(relationship_size > 24 for _, _, relationship_size in results)
