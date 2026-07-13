@@ -19,6 +19,7 @@ st.set_page_config(
 )
 
 from modules.home import render_home, render_roadmap
+from modules.lazy_tabs import enable_lazy_tabs_for
 from modules.sessions_1_8 import (
     session_1,
     session_2,
@@ -50,9 +51,67 @@ from modules.tools_runtime_patch import install as install_tools_runtime_patch
 from modules.ui_components import footer, inject_css
 
 
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.0.1"
 
 install_tools_runtime_patch()
+
+# The original session pages use five ``st.tabs`` containers. Streamlit normally
+# computes all five bodies on every rerun, even when only one tab is visible.
+# Transform them once at startup so only the selected tab executes. This is the
+# main concurrency safeguard for Streamlit Community Cloud.
+(
+    session_1,
+    session_2,
+    session_3,
+    session_4,
+    session_5,
+    session_6,
+    session_7,
+    session_8,
+    session_9,
+    session_10,
+    session_11,
+    session_12,
+    session_13,
+    session_14,
+    session_15,
+    session_16,
+) = enable_lazy_tabs_for(
+    (
+        session_1,
+        session_2,
+        session_3,
+        session_4,
+        session_5,
+        session_6,
+        session_7,
+        session_8,
+        session_9,
+        session_10,
+        session_11,
+        session_12,
+        session_13,
+        session_14,
+        session_15,
+        session_16,
+    )
+)
+
+(
+    render_case_library,
+    render_chart_engine,
+    render_quiz_zone,
+    render_resources,
+    render_storytelling_builder,
+) = enable_lazy_tabs_for(
+    (
+        render_case_library,
+        render_chart_engine,
+        render_quiz_zone,
+        render_resources,
+        render_storytelling_builder,
+    )
+)
 
 
 def _session_4_with_correction() -> None:
