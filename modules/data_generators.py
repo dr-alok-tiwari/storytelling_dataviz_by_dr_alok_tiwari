@@ -172,9 +172,11 @@ def healthcare_patient_flow(seed: int = 606) -> pd.DataFrame:
             0.03,
             0.02,
             0.01,
-        ]
+        ],
+        dtype=float,
     )
-    hours = rng.choice(range(24), n, p=probabilities)
+    probabilities /= probabilities.sum()
+    hours = rng.choice(np.arange(24), n, p=probabilities)
     departments = rng.choice(
         ["Emergency", "OPD", "ICU", "Surgery", "Radiology"],
         n,
