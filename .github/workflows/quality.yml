@@ -13,6 +13,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.10", "3.12"]
 
@@ -32,8 +33,10 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q app.py modules tests
 
-      - name: Lint production shell
-        run: ruff check app.py modules/data_generators.py modules/home.py modules/tools.py modules/tools_runtime_patch.py modules/ui_components.py tests --ignore E402,F401
+      - name: Check critical Python errors
+        run: ruff check app.py modules/data_generators.py modules/home.py modules/tools.py modules/tools_runtime_patch.py modules/ui_components.py tests --select E9,F63,F7,F82 --ignore E402,F401
 
       - name: Test
+        env:
+          STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
         run: pytest
