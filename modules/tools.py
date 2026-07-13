@@ -1,540 +1,740 @@
-"""
-tools.py
-Special interactive tools:
-- Chart Recommendation Engine
-- Storytelling Framework Builder
-- Dashboard Design Studio
-- Business Case Library
-- Quiz Zone
-"""
-import streamlit as st
-import pandas as pd
+"""Interactive practice tools for chart selection, storytelling, cases, and quizzes."""
+
+from __future__ import annotations
+
+import hashlib
+import re
+from dataclasses import dataclass
+
 import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import io
+import streamlit as st
 
-from modules.ui_components import (
-    callout_insight, callout_manager, callout_mistake, callout_action,
-    hero, footer, PRIMARY, ACCENT, SUCCESS, DANGER
-)
 from modules.data_generators import (
-    retail_sales, marketing_campaign, operations_delays,
-    financial_expenses, healthcare_patient_flow, bed_occupancy,
-    regional_sales, scatter_sales_spend, time_series_revenue
+    bed_occupancy,
+    customer_satisfaction,
+    financial_expenses,
+    healthcare_patient_flow,
+    marketing_campaign,
+    operations_delays,
+    regional_sales,
+    scatter_sales_spend,
+    time_series_revenue,
 )
 from modules.quiz_bank import QUIZ_BANK
-
-rng = np.random.default_rng(42)
-WARNING = "#E67E22"
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  CHART RECOMMENDATION ENGINE
-# ─────────────────────────────────────────────────────────────────────────────
-CHART_RECS = {
-    ("categorical", "compare", "executive"): {
-        "charts": ["Horizontal sorted bar chart", "Dot plot"],
-        "why": "Executives need to rank and compare quickly. Horizontal bars with category labels are easiest to read on a large screen.",
-        "avoid": "3D bar charts, unsorted bars, pie charts with many slices."
-    },
-    ("categorical", "rank", "executive"): {
-        "charts": ["Horizontal bar (sorted descending)", "Lollipop chart"],
-        "why": "Rank ordering is the primary task. Sorted horizontal bars make position encoding work perfectly.",
-        "avoid": "Unsorted bars, pie/donut charts."
-    },
-    ("numerical", "distribution", "analyst"): {
-        "charts": ["Box plot", "Violin plot", "Histogram"],
-        "why": "Analysts need to see median, spread, and outliers — not just averages. Box and violin plots show all of these.",
-        "avoid": "Bar chart of averages (hides variance), pie charts."
-    },
-    ("numerical", "show relationship", "analyst"): {
-        "charts": ["Scatter plot with trend line", "Bubble chart", "Correlation heat map"],
-        "why": "Scatter plots are the definitive tool for showing relationships between two quantitative variables.",
-        "avoid": "Line charts (for non-time data), bar charts."
-    },
-    ("time-series", "show trend", "executive"): {
-        "charts": ["Line chart (annotated)", "Area chart (single series)"],
-        "why": "Line charts encode trend in slope — the most natural reading for temporal data. Annotation adds the business narrative.",
-        "avoid": "Pie charts, 3D area charts, bar charts for long time series."
-    },
-    ("time-series", "show trend", "analyst"): {
-        "charts": ["Line chart with confidence band", "Multiple line chart (highlighted)", "Heat map calendar"],
-        "why": "Analysts may need to see variance and seasonality. Heat map calendars reveal weekly/seasonal patterns invisible on line charts.",
-        "avoid": "Spaghetti charts (>5 unlabeled lines), pie charts."
-    },
-    ("time-series", "show deviation", "executive"): {
-        "charts": ["Line with reference band", "Diverging bar (vs target)"],
-        "why": "Executives need to see where performance exceeds or falls short of targets — diverging from a baseline makes this immediate.",
-        "avoid": "Standard bar charts that hide the deviation direction."
-    },
-    ("categorical", "show composition", "executive"): {
-        "charts": ["100% stacked bar", "Donut chart (≤5 categories)"],
-        "why": "100% stacked bar shows both absolute values and relative composition. Donut works only for very few categories.",
-        "avoid": "Pie with >5 categories, 3D pie charts."
-    },
-    ("categorical", "show composition", "analyst"): {
-        "charts": ["Treemap", "Stacked bar", "Sunburst chart"],
-        "why": "Treemaps show hierarchical composition efficiently. Sunbursts add a second tier without overwhelming.",
-        "avoid": "Pie with >5 slices."
-    },
-    ("numerical", "compare", "operations manager"): {
-        "charts": ["Side-by-side bar", "Bullet chart", "Small multiples"],
-        "why": "Operations managers need to benchmark departments/shifts. Side-by-side bars and bullet charts show actuals vs targets clearly.",
-        "avoid": "Pie charts, single-series charts that hide variation."
-    },
-    ("relational", "show relationship", "analyst"): {
-        "charts": ["Network graph", "Chord diagram", "Sankey diagram"],
-        "why": "Relational data (flows, connections) needs purpose-built charts. Sankey charts show flows through stages perfectly.",
-        "avoid": "Bar or line charts — they cannot encode network structure."
-    },
-    ("geospatial", "compare", "executive"): {
-        "charts": ["Choropleth map (shaded regions)", "Bubble map (sized markers)"],
-        "why": "Geographic patterns are best revealed with maps. Choropleth works for regional aggregates; bubble maps for point data.",
-        "avoid": "Bar charts for geographic data — miss the spatial pattern."
-    },
-    ("hierarchical", "show composition", "analyst"): {
-        "charts": ["Treemap", "Sunburst chart", "Icicle chart"],
-        "why": "Hierarchical data has two levels of grouping. Treemaps encode size as area — the natural mental model for hierarchy.",
-        "avoid": "Pie charts — they cannot show hierarchy."
-    },
-    ("numerical", "show distribution", "healthcare manager"): {
-        "charts": ["Box plot", "Histogram", "Violin plot with box"],
-        "why": "Clinical decisions depend on understanding the full distribution of outcomes, not just averages.",
-        "avoid": "KPI cards alone — they hide the variance that drives clinical decisions."
-    },
-    ("time-series", "compare", "healthcare manager"): {
-        "charts": ["Control chart (SPC)", "Multi-line annotated chart"],
-        "why": "Healthcare managers need to distinguish normal variation from signals requiring intervention. SPC charts are the standard tool.",
-        "avoid": "Plain line charts without control limits — they make all variation look significant."
-    },
-}
+from modules.ui_components import (
+    ACCENT,
+    DANGER,
+    PRIMARY,
+    SUCCESS,
+    WARNING,
+    callout_action,
+    callout_insight,
+    callout_manager,
+    callout_mistake,
+    hero,
+)
 
 
-def get_recommendation(data_type, question, audience):
-    key = (data_type, question, audience)
-    if key in CHART_RECS:
-        return CHART_RECS[key]
-    # Fallback
-    return {
-        "charts": ["Bar chart (sorted)", "Line chart (for time data)", "Scatter plot (for relationships)"],
-        "why": "This combination is common in business settings. Start with the simplest chart that answers the question.",
-        "avoid": "3D charts, pie charts with many segments, rainbow color palettes."
+@dataclass(frozen=True)
+class ChartRecommendation:
+    primary: str
+    alternatives: tuple[str, ...]
+    rationale: str
+    avoid: str
+
+
+def _audience_note(audience: str) -> str:
+    notes = {
+        "Executive": "Keep the visual sparse, lead with the conclusion, and label the decision-relevant value directly.",
+        "Analyst": "Retain distribution, uncertainty, and diagnostic detail so the pattern can be challenged and verified.",
+        "Operations manager": "Emphasise targets, exceptions, thresholds, and the owner of the next action.",
+        "Healthcare manager": "Show denominators, thresholds, uncertainty, and operational context; avoid patient-identifiable detail.",
+        "Customer / public": "Use plain language, direct labels, and a short explanation of what the chart does and does not prove.",
     }
+    return notes[audience]
 
 
-def render_chart_engine():
-    hero("📊 Chart Selection Engine",
-         "Select your data type, business question, and audience — get a tailored chart recommendation.")
-    col1, col2, col3 = st.columns(3)
-    data_type = col1.selectbox("Data type:", [
-        "categorical", "numerical", "time-series", "geospatial", "relational", "hierarchical"
-    ], key="ce_dtype")
-    question = col2.selectbox("Business question:", [
-        "compare", "rank", "show trend", "show distribution", "show relationship",
-        "show composition", "show deviation"
-    ], key="ce_q")
-    audience = col3.selectbox("Audience:", [
-        "executive", "analyst", "operations manager", "healthcare manager", "customer"
-    ], key="ce_aud")
+def get_recommendation(
+    data_type: str,
+    question: str,
+    audience: str,
+    category_count: int = 5,
+) -> ChartRecommendation:
+    """Return a deterministic recommendation for every valid input combination."""
+    data_type = data_type.lower()
+    question = question.lower()
 
-    if st.button("Get Recommendation ▶", key="ce_rec"):
-        rec = get_recommendation(data_type, question, audience)
-        st.markdown("---")
-        st.markdown("### ✅ Recommended Chart Types")
-        for i, chart in enumerate(rec["charts"], 1):
-            st.markdown(f"**{i}. {chart}**")
-        callout_insight(rec["why"], "Why These Charts?")
-        callout_mistake(rec["avoid"], "Avoid")
-
-        st.markdown("### 📌 Live Example")
-        if data_type in ("categorical", "hierarchical") and question in ("compare", "rank", "show composition"):
-            df = regional_sales().groupby("region")["sales"].sum().reset_index().sort_values("sales", ascending=False)
-            if "composition" in question:
-                fig = px.pie(df, names="region", values="sales", title=f"Example: {rec['charts'][0]}")
-            else:
-                fig = go.Figure(go.Bar(x=df["region"], y=df["sales"], marker_color=PRIMARY))
-                fig.update_layout(title=f"Example: {rec['charts'][0]}")
-        elif data_type == "time-series":
-            df = time_series_revenue()
-            fig = go.Figure(go.Scatter(x=df["month"], y=df["revenue"], mode="lines",
-                                        line=dict(color=PRIMARY, width=2.5)))
-            fig.update_layout(title=f"Example: {rec['charts'][0]}")
-        elif question == "show relationship":
-            df = scatter_sales_spend()
-            fig = px.scatter(df, x="marketing_spend", y="revenue", color="channel", trendline="ols",
-                             title=f"Example: {rec['charts'][0]}")
-        elif question == "show distribution":
-            from modules.data_generators import customer_satisfaction
-            df = customer_satisfaction()
-            fig = px.box(df, x="department", y="nps_score", color="department",
-                         title=f"Example: {rec['charts'][0]}")
+    if data_type == "time series":
+        if question in {"show trend", "compare", "show deviation"}:
+            primary = "Annotated line chart" if question != "show deviation" else "Line chart with target band"
+            alternatives = ("Small-multiple line charts", "Slope chart for two time points")
+            rationale = "Time is ordered. Position and slope reveal direction, turning points, seasonality, and deviation from target."
+            avoid = "Avoid pie charts and equally spaced labels for irregular time intervals."
         else:
-            df = financial_expenses().groupby("category")["amount_lakhs"].sum().reset_index()
-            fig = px.bar(df.sort_values("amount_lakhs", ascending=False),
-                         x="category", y="amount_lakhs",
-                         title=f"Example: {rec['charts'][0]}",
-                         color_discrete_sequence=[PRIMARY])
-        fig.update_layout(height=350)
-        st.plotly_chart(fig, use_container_width=True)
+            primary = "Calendar or period heat map"
+            alternatives = ("Distribution by period", "Faceted line chart")
+            rationale = "A heat map can reveal recurring temporal patterns when the question is about concentration or variation."
+            avoid = "Avoid connecting observations when the time series has missing intervals."
+
+    elif data_type == "categorical":
+        if question in {"compare", "rank"}:
+            primary = "Sorted horizontal bar chart"
+            alternatives = ("Dot plot", "Lollipop chart")
+            rationale = "A common baseline makes categorical amounts easy to compare; sorting removes mental ranking work."
+            avoid = "Avoid unsorted bars, 3D effects, and pie charts when exact comparison matters."
+        elif question == "show composition":
+            if category_count <= 5:
+                primary = "100% stacked bar chart"
+                alternatives = ("Donut chart for a single total", "Treemap for hierarchy")
+            else:
+                primary = "Sorted bar chart of shares"
+                alternatives = ("Treemap", "100% stacked bar after grouping small categories")
+            rationale = "Composition requires a visible whole. A common 0–100% scale supports comparison across groups."
+            avoid = "Avoid pies or donuts with more than five slices."
+        elif question == "show deviation":
+            primary = "Diverging bar chart"
+            alternatives = ("Bullet chart", "Variance dot plot")
+            rationale = "A shared zero or target baseline makes above-versus-below performance immediately visible."
+            avoid = "Avoid separate charts with inconsistent scales for actual and target."
+        else:
+            primary = "Grouped or faceted bar chart"
+            alternatives = ("Heat map", "Dot plot")
+            rationale = "Categorical structure is best preserved with aligned positions rather than angle or area comparisons."
+            avoid = "Avoid line charts unless the categories have a true ordered sequence."
+
+    elif data_type == "numerical":
+        if question in {"show distribution", "compare"}:
+            primary = "Box plot with visible observations"
+            alternatives = ("Histogram", "Violin plot")
+            rationale = "Distribution charts reveal median, spread, skew, and outliers that averages conceal."
+            avoid = "Avoid a bar chart of means without sample size or variation."
+        elif question == "show relationship":
+            primary = "Scatter plot with trend line"
+            alternatives = ("Hexbin plot for dense data", "Bubble chart for a justified third variable")
+            rationale = "Two position channels provide the most accurate view of association, clusters, and outliers."
+            avoid = "Do not claim causation from a visual association alone."
+        elif question == "show deviation":
+            primary = "Distribution with reference line"
+            alternatives = ("Control chart", "Diverging dot plot")
+            rationale = "A reference line preserves individual variation while showing distance from a standard."
+            avoid = "Avoid hiding variance inside a single KPI card."
+        else:
+            primary = "Histogram"
+            alternatives = ("ECDF", "Density plot")
+            rationale = "Numerical data should first be inspected for shape, range, gaps, and extreme observations."
+            avoid = "Avoid converting continuous measurements into arbitrary categories too early."
+
+    elif data_type == "geospatial":
+        primary = "Choropleth map" if question in {"compare", "show deviation"} else "Proportional-symbol map"
+        alternatives = ("Ranked bar chart alongside the map", "Small-multiple regional maps")
+        rationale = "Location is part of the analytical question, so spatial adjacency and regional concentration must remain visible."
+        avoid = "Avoid maps when geography is incidental; a sorted bar chart is usually more precise."
+
+    elif data_type == "relational":
+        if question in {"show relationship", "show composition"}:
+            primary = "Sankey diagram"
+            alternatives = ("Network graph", "Chord diagram")
+            rationale = "Relational charts preserve links or flows between entities instead of flattening them into categories."
+            avoid = "Avoid Sankey diagrams with too many crossing flows or unlabeled nodes."
+        else:
+            primary = "Adjacency matrix"
+            alternatives = ("Network graph", "Ranked node table")
+            rationale = "An adjacency matrix scales better than a node-link diagram when the network is dense."
+            avoid = "Avoid decorative network layouts that obscure rather than explain structure."
+
+    else:  # hierarchical
+        primary = "Treemap" if question == "show composition" else "Sunburst chart"
+        alternatives = ("Indented bar chart", "Icicle chart")
+        rationale = "Hierarchy requires both parent–child structure and magnitude to remain visible."
+        avoid = "Avoid a flat pie chart because it cannot communicate multiple levels."
+
+    return ChartRecommendation(
+        primary=primary,
+        alternatives=alternatives,
+        rationale=f"{rationale} {_audience_note(audience)}",
+        avoid=avoid,
+    )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  STORYTELLING FRAMEWORK BUILDER
-# ─────────────────────────────────────────────────────────────────────────────
-def render_storytelling_builder():
-    hero("📝 Storytelling Framework Builder",
-         "Structure your data story using the proven Context → Insight → Recommendation framework.")
-    st.write("""
-    Complete each layer of the storytelling framework below.
-    The app will assemble your story and let you download it.
-    """)
-    st.markdown("---")
+def _example_figure(
+    recommendation: ChartRecommendation,
+    data_type: str,
+    question: str,
+) -> go.Figure:
+    primary = recommendation.primary
 
-    col1, col2 = st.columns([1.2, 1])
-    with col1:
-        st.markdown("#### 1. Context — What is the situation?")
-        domain = st.selectbox("Business domain:", [
-            "Sales", "Marketing", "Operations", "Finance", "Healthcare", "HR", "Strategy"
-        ], key="sb_domain")
-        period = st.text_input("Time period:", "Q3 2024", key="sb_period")
-        context_text = st.text_area("Describe the situation in 2–3 sentences:", height=70,
-                                     placeholder="e.g., Revenue has been declining for 3 consecutive quarters across the North and West regions.",
-                                     key="sb_context")
+    if primary == "Sorted horizontal bar chart":
+        df = regional_sales().groupby("region", as_index=False)["sales"].sum().sort_values("sales")
+        fig = px.bar(df, x="sales", y="region", orientation="h", text_auto=True)
+        fig.update_traces(marker_color=PRIMARY)
+        fig.update_layout(title="Regional sales ranked from lowest to highest", xaxis_title="Sales (₹ lakh)")
 
-        st.markdown("#### 2. Business Question — What are you trying to answer?")
-        biz_q = st.text_input("Business question:", key="sb_q",
-                               placeholder="e.g., Which region is underperforming and why?")
+    elif primary == "100% stacked bar chart":
+        df = financial_expenses()
+        fig = px.bar(df, x="quarter", y="amount_lakhs", color="category", barnorm="percent")
+        fig.update_layout(title="Cost mix across quarters", yaxis_title="Share of quarterly cost (%)")
 
-        st.markdown("#### 3. Data Evidence — What does the data show?")
-        data_point_1 = st.text_input("Key finding 1:", key="sb_dp1",
-                                      placeholder="e.g., North region is 34% below Q3 target")
-        data_point_2 = st.text_input("Key finding 2:", key="sb_dp2",
-                                      placeholder="e.g., Marketing spend in North is 22% lower than other regions")
-        data_point_3 = st.text_input("Key finding 3 (optional):", key="sb_dp3")
+    elif primary == "Sorted bar chart of shares":
+        df = financial_expenses().groupby("category", as_index=False)["amount_lakhs"].sum()
+        df["share"] = df["amount_lakhs"] / df["amount_lakhs"].sum() * 100
+        df = df.sort_values("share")
+        fig = px.bar(df, x="share", y="category", orientation="h", text_auto=".1f")
+        fig.update_traces(marker_color=PRIMARY)
+        fig.update_layout(title="Share of total cost by category", xaxis_title="Share (%)")
 
-        st.markdown("#### 4. Pattern — What pattern do you observe?")
-        pattern = st.text_area("Describe the pattern:", height=60, key="sb_pattern",
-                                placeholder="e.g., Underperforming regions correlate with lower marketing spend and fewer sales visits.")
+    elif primary in {"Diverging bar chart", "Bullet chart"}:
+        df = regional_sales().groupby("region", as_index=False)[["sales", "target"]].sum()
+        df["gap"] = df["sales"] - df["target"]
+        df = df.sort_values("gap")
+        colors = [DANGER if value < 0 else SUCCESS for value in df["gap"]]
+        fig = go.Figure(go.Bar(x=df["gap"], y=df["region"], orientation="h", marker_color=colors))
+        fig.add_vline(x=0, line_color="#263238")
+        fig.update_layout(title="Sales gap versus target", xaxis_title="Gap (₹ lakh)")
 
-        st.markdown("#### 5. Insight — What does this mean?")
-        insight = st.text_area("State the insight:", height=60, key="sb_insight",
-                                placeholder="e.g., The North's underperformance is driven by resource deficit, not market conditions.")
+    elif primary in {"Annotated line chart", "Line chart with target band"}:
+        df = time_series_revenue()
+        fig = go.Figure(go.Scatter(x=df["month"], y=df["revenue"], mode="lines", line={"color": PRIMARY, "width": 3}))
+        peak = df.loc[df["revenue"].idxmax()]
+        fig.add_annotation(
+            x=peak["month"],
+            y=peak["revenue"],
+            text=f"Peak: ₹{peak['revenue']:.1f}L",
+            showarrow=True,
+            arrowhead=2,
+            ay=-35,
+        )
+        if primary == "Line chart with target band":
+            fig.add_hrect(y0=145, y1=165, fillcolor=ACCENT, opacity=0.12, line_width=0, annotation_text="Target band")
+        fig.update_layout(title="Revenue trend with decision context", yaxis_title="Revenue (₹ lakh)")
 
-        st.markdown("#### 6. Implication — So what?")
-        implication = st.text_area("Business implication:", height=60, key="sb_impl",
-                                    placeholder="e.g., Without intervention, the North will miss annual target by ₹40L.")
+    elif primary in {"Box plot with visible observations", "Distribution with reference line"}:
+        df = customer_satisfaction()
+        fig = px.box(df, x="department", y="nps_score", color="department", points="outliers")
+        if primary == "Distribution with reference line":
+            fig.add_hline(y=7, line_dash="dash", line_color=ACCENT, annotation_text="Target = 7")
+        fig.update_layout(title="Customer score distribution by department", showlegend=False)
 
-        st.markdown("#### 7. Recommendation — What should be done?")
-        rec = st.text_area("Your recommendation:", height=70, key="sb_rec",
-                            placeholder="e.g., Reallocate ₹8L from South marketing budget to North in Q4. Target 15% recovery.")
+    elif primary == "Scatter plot with trend line":
+        df = scatter_sales_spend()
+        fig = px.scatter(df, x="marketing_spend", y="revenue", color="channel", trendline="ols")
+        fig.update_layout(title="Marketing spend and revenue association")
 
-        st.markdown("#### 8. Action — Who does what, by when?")
-        action = st.text_input("Specific action:", key="sb_action",
-                                placeholder="e.g., Regional VP to submit revised plan by Oct 15.")
+    elif primary == "Histogram":
+        df = customer_satisfaction()
+        fig = px.histogram(df, x="nps_score", nbins=18)
+        fig.update_traces(marker_color=PRIMARY)
+        fig.update_layout(title="Distribution of customer scores")
 
-    with col2:
-        st.markdown("#### 📋 Your Story Preview")
-        story_parts = [
-            ("Context", context_text, "📌"),
-            ("Question", biz_q, "❓"),
-            ("Evidence", f"• {data_point_1}\n• {data_point_2}\n{'• ' + data_point_3 if data_point_3 else ''}", "📊"),
-            ("Pattern", pattern, "🔍"),
-            ("Insight", insight, "💡"),
-            ("Implication", implication, "⚡"),
-            ("Recommendation", rec, "🎯"),
-            ("Action", action, "✅"),
-        ]
-        for label, content, icon in story_parts:
+    elif primary in {"Choropleth map", "Proportional-symbol map"}:
+        geo = pd.DataFrame(
+            {
+                "city": ["Delhi", "Mumbai", "Bengaluru", "Kolkata", "Chennai", "Goa"],
+                "lat": [28.61, 19.08, 12.97, 22.57, 13.08, 15.49],
+                "lon": [77.21, 72.88, 77.59, 88.36, 80.27, 73.83],
+                "value": [82, 96, 110, 65, 78, 48],
+            }
+        )
+        fig = px.scatter_geo(
+            geo,
+            lat="lat",
+            lon="lon",
+            size="value",
+            color="value",
+            hover_name="city",
+            scope="asia",
+            projection="natural earth",
+        )
+        fig.update_geos(lataxis_range=[5, 38], lonaxis_range=[65, 100], fitbounds="locations")
+        fig.update_layout(title="Illustrative regional demand")
+
+    elif primary in {"Sankey diagram", "Network graph", "Adjacency matrix"}:
+        fig = go.Figure(
+            go.Sankey(
+                node={"label": ["Website", "Store", "Cart", "Purchase", "Exit"]},
+                link={
+                    "source": [0, 0, 1, 1, 2, 2],
+                    "target": [2, 4, 2, 4, 3, 4],
+                    "value": [60, 40, 35, 15, 55, 40],
+                },
+            )
+        )
+        fig.update_layout(title="Customer journey flow")
+
+    else:  # hierarchy
+        hierarchy = pd.DataFrame(
+            {
+                "division": ["Consumer", "Consumer", "Enterprise", "Enterprise"],
+                "category": ["Digital", "Retail", "Services", "Software"],
+                "value": [42, 28, 18, 31],
+            }
+        )
+        if primary == "Sunburst chart":
+            fig = px.sunburst(hierarchy, path=["division", "category"], values="value")
+        else:
+            fig = px.treemap(hierarchy, path=["division", "category"], values="value")
+        fig.update_layout(title="Revenue hierarchy by division and category")
+
+    fig.update_layout(height=420, margin={"t": 60, "r": 25, "b": 45, "l": 55})
+    return fig
+
+
+def render_chart_engine() -> None:
+    hero(
+        "📊 Chart Selection Engine",
+        "Describe the data, analytical question, and audience to receive a defensible chart recommendation.",
+    )
+
+    first, second, third, fourth = st.columns(4)
+    data_type = first.selectbox(
+        "Data structure",
+        ["Categorical", "Numerical", "Time series", "Geospatial", "Relational", "Hierarchical"],
+        key="ce_dtype",
+    )
+    question = second.selectbox(
+        "Analytical question",
+        ["Compare", "Rank", "Show trend", "Show distribution", "Show relationship", "Show composition", "Show deviation"],
+        key="ce_question",
+    )
+    audience = third.selectbox(
+        "Audience",
+        ["Executive", "Analyst", "Operations manager", "Healthcare manager", "Customer / public"],
+        key="ce_audience",
+    )
+    category_count = fourth.number_input(
+        "Number of categories",
+        min_value=2,
+        max_value=50,
+        value=5,
+        help="Used when composition or categorical comparisons are involved.",
+    )
+
+    recommendation = get_recommendation(data_type, question, audience, int(category_count))
+
+    st.markdown("### Recommended visual")
+    primary_col, alternative_col = st.columns([1.1, 1])
+    with primary_col:
+        st.success(f"**Primary:** {recommendation.primary}", icon="✅")
+        callout_insight(recommendation.rationale, "Why it fits")
+    with alternative_col:
+        st.markdown("#### Good alternatives")
+        for alternative in recommendation.alternatives:
+            st.markdown(f"- {alternative}")
+        callout_mistake(recommendation.avoid, "Avoid")
+
+    st.markdown("### Matching live example")
+    figure = _example_figure(recommendation, data_type, question)
+    st.plotly_chart(figure, use_container_width=True, config={"displaylogo": False, "responsive": True})
+    st.caption("The example uses deterministic synthetic data. The recommendation—not visual novelty—should drive chart choice.")
+
+
+def _safe_filename(value: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9_-]+", "_", value.strip().lower()).strip("_")
+    return cleaned or "data_story"
+
+
+def render_storytelling_builder() -> None:
+    hero(
+        "📝 Storytelling Framework Builder",
+        "Develop a complete Context → Evidence → Insight → Recommendation → Action narrative.",
+    )
+
+    input_col, preview_col = st.columns([1.25, 1], gap="large")
+    with input_col:
+        domain = st.selectbox(
+            "Business domain",
+            ["Sales", "Marketing", "Operations", "Finance", "Healthcare", "HR", "Strategy"],
+            key="sb_domain",
+        )
+        period = st.text_input("Time period", "Q3 2026", key="sb_period")
+        context = st.text_area(
+            "1. Context — what is the situation?",
+            key="sb_context",
+            height=90,
+            placeholder="Revenue has declined for three quarters in the North and West regions.",
+        )
+        question = st.text_input(
+            "2. Business question",
+            key="sb_question",
+            placeholder="Which region is underperforming, why, and what should change?",
+        )
+        evidence_1 = st.text_input("3. Evidence — key finding 1", key="sb_evidence_1")
+        evidence_2 = st.text_input("Evidence — key finding 2", key="sb_evidence_2")
+        evidence_3 = st.text_input("Evidence — key finding 3 (optional)", key="sb_evidence_3")
+        pattern = st.text_area("4. Pattern — what connects the findings?", key="sb_pattern", height=75)
+        insight = st.text_area("5. Insight — what does the pattern mean?", key="sb_insight", height=75)
+        implication = st.text_area("6. Implication — what happens without action?", key="sb_implication", height=75)
+        recommendation = st.text_area("7. Recommendation — what should be done?", key="sb_recommendation", height=90)
+        action = st.text_input("8. Action — who does what, by when?", key="sb_action")
+
+    evidence = [item for item in [evidence_1, evidence_2, evidence_3] if item.strip()]
+    sections = [
+        ("Context", context, "📌"),
+        ("Business question", question, "❓"),
+        ("Evidence", "\n".join(f"• {item}" for item in evidence), "📊"),
+        ("Pattern", pattern, "🔍"),
+        ("Insight", insight, "💡"),
+        ("Implication", implication, "⚡"),
+        ("Recommendation", recommendation, "🎯"),
+        ("Action", action, "✅"),
+    ]
+
+    with preview_col:
+        st.markdown("### Story preview")
+        completed_sections = 0
+        for label, content, icon in sections:
+            st.markdown(f"**{icon} {label}**")
             if content.strip():
-                st.markdown(f"**{icon} {label}**")
+                completed_sections += 1
                 st.markdown(f"> {content}")
             else:
-                st.markdown(f"**{icon} {label}** — *not yet filled*")
+                st.caption("Not completed yet")
 
-        if st.button("Generate & Download Story", key="sb_dl"):
-            story_text = f"""DATA STORY: {domain} | {period}
-{'='*50}
+        st.progress(completed_sections / len(sections), text=f"{completed_sections} of {len(sections)} story layers complete")
+
+        required = [context, question, insight, recommendation, action]
+        if all(item.strip() for item in required):
+            story_text = f"""DATA STORY — {domain} | {period}
+{'=' * 64}
 
 CONTEXT
-{context_text}
+{context}
 
 BUSINESS QUESTION
-{biz_q}
+{question}
 
 DATA EVIDENCE
-• {data_point_1}
-• {data_point_2}
-{"• " + data_point_3 if data_point_3 else ""}
+{chr(10).join(f'• {item}' for item in evidence) if evidence else '[No evidence entered]'}
 
 PATTERN
-{pattern}
+{pattern or '[Not entered]'}
 
 INSIGHT
 {insight}
 
 IMPLICATION
-{implication}
+{implication or '[Not entered]'}
 
 RECOMMENDATION
-{rec}
+{recommendation}
 
 ACTION
 {action}
 
 ---
-Generated by: Storytelling using Data Visualization App
+Generated by Storytelling using Data Visualization
 PGDM-BDA | Goa Institute of Management | Dr. Alok Tiwari
 """
-            st.download_button("⬇ Download Story (.txt)", story_text.encode(),
-                               f"data_story_{domain.lower()}.txt", "text/plain")
-            callout_action("Story assembled. Check: does each section logically lead to the next? Is the recommendation specific enough to act on?", "Story Check")
+            st.download_button(
+                "Download story as text",
+                story_text.encode("utf-8"),
+                file_name=f"{_safe_filename(domain)}_data_story.txt",
+                mime="text/plain",
+                use_container_width=True,
+            )
+            callout_action(
+                "Read the story aloud. Each layer should logically earn the next, and the action should name an owner and deadline.",
+                "Quality check",
+            )
+        else:
+            st.info("Complete Context, Business question, Insight, Recommendation, and Action to enable export.")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  BUSINESS CASE LIBRARY
-# ─────────────────────────────────────────────────────────────────────────────
 CASES = {
-    "Sales Performance Story": {
-        "dataset": "regional_sales",
-        "context": "A regional FMCG company is preparing its Q3 business review. The sales director suspects North region is underperforming but needs data to make the case for resource reallocation.",
+    "Sales performance": {
+        "loader": regional_sales,
+        "context": "A regional company is preparing its quarterly review and must decide where to reallocate sales support.",
         "questions": [
-            "Which region has the largest gap between actual sales and target?",
-            "Which product category drives the most variance across regions?",
-            "If you could reallocate budget from one region to another, what would you recommend and why?"
+            "Which region has the largest actual-versus-target shortfall?",
+            "Which product category contributes most to regional variation?",
+            "What targeted resource action is supported by the evidence?",
         ],
-        "story_title": "North and West Regions Need Immediate Support — ₹15L Reallocation Recommended"
     },
-    "Marketing Campaign ROI Story": {
-        "dataset": "marketing_campaign",
-        "context": "The CMO is reviewing marketing channel performance before finalizing next year's budget. Total marketing budget is ₹150L. The question: which channels should be scaled, and which should be cut?",
+    "Marketing campaign ROI": {
+        "loader": marketing_campaign,
+        "context": "The CMO must rebalance next year's channel budget using return, conversion, and scale evidence.",
         "questions": [
             "Which channel has the highest ROI?",
-            "Which channel spends the most but delivers the least per rupee?",
-            "If budget must be cut by 20%, which channel would you cut first, and why?"
+            "Which high-spend channel underperforms?",
+            "Where should the next incremental ₹10 lakh be allocated?",
         ],
-        "story_title": "SEO and Email Deliver 3× More Return Per Rupee — Double Down There, Cut TV"
     },
-    "Operations Delay Story": {
-        "dataset": "operations_delays",
-        "context": "The operations head is concerned about increasing delivery delays. Customer complaints have risen 28% this quarter. The board wants a plan by end of month.",
+    "Operations delays": {
+        "loader": operations_delays,
+        "context": "The operations head needs to know whether delays are improving and which operational factor deserves investigation.",
         "questions": [
-            "Is the delay trend improving or worsening over time?",
-            "Is there a relationship between shipment volume and delay hours?",
-            "What level of on-time delivery is realistic as a 6-month target?"
+            "Is average delay improving over time?",
+            "Is shipment volume associated with delay?",
+            "What realistic six-month target should management adopt?",
         ],
-        "story_title": "Delays Are Improving But Still Above Target — Process Review Required in Weeks 12–20"
     },
-    "Finance Cost Control Story": {
-        "dataset": "financial_expenses",
-        "context": "The CFO wants to understand cost structure before presenting to the board. Total costs have grown 18% over 8 quarters. The board wants to see which categories are driving this growth.",
+    "Finance cost control": {
+        "loader": financial_expenses,
+        "context": "The CFO needs a defensible view of cost structure and the categories driving change over eight quarters.",
         "questions": [
-            "Which cost category has grown fastest as a proportion of total cost?",
-            "Are any categories shrinking as a share of total?",
-            "What single cost action would have the highest impact on profitability?"
+            "Which category accounts for the largest total cost?",
+            "Which category is growing fastest?",
+            "What cost action would have the largest impact without relying on an arbitrary cut?",
         ],
-        "story_title": "Technology Cost Growing 3× Faster Than Revenue — Vendor Contract Review Urgent"
     },
-    "Healthcare Hospital Dashboard Story": {
-        "dataset": "bed_occupancy",
-        "context": "The hospital administrator is preparing the monthly operations review. Three wards have been flagged as potential capacity risks. The clinical director needs to decide whether to open overflow capacity.",
+    "Hospital capacity": {
+        "loader": bed_occupancy,
+        "context": "A hospital administrator must assess ward-level capacity pressure and whether overflow planning is justified.",
         "questions": [
-            "Which ward is most consistently above 85% occupancy?",
-            "Are there specific days of week when occupancy spikes?",
-            "Should overflow capacity be opened? What data supports that decision?"
+            "Which ward has the highest average occupancy?",
+            "How frequently does each ward exceed 85% occupancy?",
+            "What operational response is supported by the pattern?",
         ],
-        "story_title": "ICU and General Wards Routinely Exceed Safe Threshold — Overflow Capacity Recommended"
     },
-    "Strategy Market Entry Story": {
-        "dataset": "scatter_sales_spend",
-        "context": "A retail brand is evaluating entry into two new channels (Online and Both). Historical data from existing channels shows the relationship between spend and revenue returns.",
+    "Channel strategy": {
+        "loader": scatter_sales_spend,
+        "context": "A retail brand is evaluating whether revenue response differs across online, offline, and blended channels.",
         "questions": [
-            "Which existing channel shows the strongest spend-revenue relationship?",
-            "Are there channels where spend is high but returns are low?",
-            "Based on the pattern, which new channel entry would you recommend and what initial budget?"
+            "Which channel shows the strongest spend–revenue association?",
+            "Where do high-spend, low-return observations appear?",
+            "What experiment should precede a major budget shift?",
         ],
-        "story_title": "Online Channel ROI Is 2.4× Offline — Prioritise Digital-First Market Entry"
     },
 }
 
-DATASET_LOADERS = {
-    "regional_sales": regional_sales,
-    "marketing_campaign": marketing_campaign,
-    "operations_delays": operations_delays,
-    "financial_expenses": financial_expenses,
-    "bed_occupancy": bed_occupancy,
-    "scatter_sales_spend": scatter_sales_spend,
-}
+
+def _case_headline(case_name: str, df: pd.DataFrame) -> str:
+    if case_name == "Sales performance":
+        summary = df.groupby("region")[["sales", "target"]].sum()
+        summary["gap"] = summary["sales"] - summary["target"]
+        region = summary["gap"].idxmin()
+        gap = abs(summary.loc[region, "gap"])
+        return f"{region} has the largest target shortfall at ₹{gap:.0f} lakh"
+    if case_name == "Marketing campaign ROI":
+        best = df.loc[df["roi"].idxmax()]
+        worst = df.loc[df["roi"].idxmin()]
+        return f"{best['channel']} leads ROI; {worst['channel']} requires a budget challenge"
+    if case_name == "Operations delays":
+        start = df["avg_delay_hrs"].head(8).mean()
+        end = df["avg_delay_hrs"].tail(8).mean()
+        change = (end / start - 1) * 100
+        direction = "improved" if change < 0 else "worsened"
+        return f"Average delays {direction} by {abs(change):.1f}% from the opening to closing period"
+    if case_name == "Finance cost control":
+        totals = df.groupby("category")["amount_lakhs"].sum().sort_values(ascending=False)
+        return f"{totals.index[0]} is the largest cost pool at ₹{totals.iloc[0]:.0f} lakh"
+    if case_name == "Hospital capacity":
+        average = df.groupby("ward")["occupancy_pct"].mean().sort_values(ascending=False)
+        return f"{average.index[0]} has the highest average occupancy at {average.iloc[0]:.1f}%"
+
+    correlations = df.groupby("channel").apply(
+        lambda group: group["marketing_spend"].corr(group["revenue"]),
+        include_groups=False,
+    )
+    channel = correlations.abs().idxmax()
+    return f"{channel} shows the strongest spend–revenue association in the synthetic sample"
 
 
-def render_case_library():
-    hero("📚 Business Case Library",
-         "Six guided case studies for sales, marketing, operations, finance, healthcare, and strategy.")
-    case_name = st.selectbox("Select case:", list(CASES.keys()), key="cl_case")
-    case = CASES[case_name]
-    df = DATASET_LOADERS[case["dataset"]]()
-    st.markdown("---")
-    col1, col2 = st.columns([1.3, 1])
-    with col1:
-        st.markdown(f"### 📌 Business Context")
-        st.write(case["context"])
-        st.markdown(f"**Story headline:** *{case['story_title']}*")
-        st.markdown("#### 🔍 Guided Questions")
-        for i, q in enumerate(case["questions"], 1):
-            st.markdown(f"{i}. {q}")
-            st.text_input(f"Your answer {i}:", key=f"cl_ans_{case_name}_{i}")
-    with col2:
-        st.markdown("#### 📊 Dataset Preview")
-        st.dataframe(df.head(20), use_container_width=True, height=220)
-        st.download_button("⬇ Download Dataset", df.to_csv(index=False).encode(),
-                           f"{case['dataset']}.csv", "text/csv")
-
-    st.markdown("---")
-    st.markdown("#### 📈 Guided Visualization")
-    if case["dataset"] == "regional_sales":
-        col_a, col_b = st.columns(2)
-        with col_a:
-            by_r = df.groupby("region")[["sales","target"]].sum().reset_index()
-            by_r["gap"] = by_r["sales"] - by_r["target"]
-            fig = px.bar(by_r.sort_values("gap"), x="region", y="gap",
-                         title="Sales vs Target Gap by Region",
-                         color="gap", color_continuous_scale="RdYlGn")
-            fig.add_hline(y=0, line_color="black")
-            fig.update_layout(height=280)
-            col_a.plotly_chart(fig, use_container_width=True)
-        with col_b:
-            fig2 = px.imshow(df.pivot_table(index="category",columns="region",values="sales"),
-                             color_continuous_scale="Blues", title="Sales Heat Map",
-                             aspect="auto")
-            fig2.update_layout(height=280)
-            col_b.plotly_chart(fig2, use_container_width=True)
-    elif case["dataset"] == "marketing_campaign":
-        col_a, col_b = st.columns(2)
-        with col_a:
-            fig = px.bar(df.sort_values("roi", ascending=False), x="channel", y="roi",
-                         title="ROI by Channel (%)", color_discrete_sequence=[PRIMARY])
-            fig.update_layout(height=280)
-            col_a.plotly_chart(fig, use_container_width=True)
-        with col_b:
-            fig2 = px.scatter(df, x="spend_lakhs", y="revenue_lakhs", size="conversions",
-                               color="channel", title="Spend vs Revenue (bubble = conversions)")
-            fig2.update_layout(height=280)
-            col_b.plotly_chart(fig2, use_container_width=True)
-    elif case["dataset"] == "operations_delays":
-        fig = px.line(df, x="week", y="avg_delay_hrs",
-                      title="Delivery Delay Trend — Is It Improving?",
-                      color_discrete_sequence=[PRIMARY])
-        fig.add_hline(y=3, line_dash="dot", line_color=SUCCESS, annotation_text="Target: 3h")
-        fig.update_layout(height=300)
-        st.plotly_chart(fig, use_container_width=True)
-    elif case["dataset"] == "financial_expenses":
-        fig = px.bar(df, x="quarter", y="amount_lakhs", color="category",
-                     barnorm="percent", title="Cost Mix Over Time (100% Stacked)")
-        fig.update_layout(height=300)
-        st.plotly_chart(fig, use_container_width=True)
-    elif case["dataset"] == "bed_occupancy":
-        avg_occ = df.groupby(["ward"])["occupancy_pct"].mean().reset_index()
-        fig = go.Figure(go.Bar(x=avg_occ["occupancy_pct"], y=avg_occ["ward"], orientation="h",
-                                marker_color=[DANGER if v > 85 else ACCENT if v > 75 else PRIMARY
-                                               for v in avg_occ["occupancy_pct"]]))
-        fig.add_vline(x=85, line_dash="dot", line_color=DANGER, annotation_text="Alert: 85%")
-        fig.update_layout(title="Average Ward Occupancy", height=300, xaxis_title="Occupancy (%)")
-        st.plotly_chart(fig, use_container_width=True)
+def _case_figure(case_name: str, df: pd.DataFrame) -> go.Figure:
+    if case_name == "Sales performance":
+        summary = df.groupby("region", as_index=False)[["sales", "target"]].sum()
+        summary["gap"] = summary["sales"] - summary["target"]
+        summary = summary.sort_values("gap")
+        colors = [DANGER if value < 0 else SUCCESS for value in summary["gap"]]
+        figure = go.Figure(go.Bar(x=summary["gap"], y=summary["region"], orientation="h", marker_color=colors))
+        figure.add_vline(x=0, line_color="#263238")
+        figure.update_layout(xaxis_title="Actual minus target (₹ lakh)")
+    elif case_name == "Marketing campaign ROI":
+        figure = px.scatter(df, x="spend_lakhs", y="roi", size="revenue_lakhs", color="channel", text="channel")
+        figure.update_traces(textposition="top center")
+    elif case_name == "Operations delays":
+        figure = px.line(df, x="week", y="avg_delay_hrs", markers=True)
+        figure.update_traces(line_color=PRIMARY)
+        figure.add_hline(y=3, line_dash="dash", line_color=ACCENT, annotation_text="Illustrative 3-hour target")
+    elif case_name == "Finance cost control":
+        figure = px.bar(df, x="quarter", y="amount_lakhs", color="category", barnorm="percent")
+        figure.update_layout(yaxis_title="Share of quarterly cost (%)")
+    elif case_name == "Hospital capacity":
+        average = df.groupby("ward", as_index=False)["occupancy_pct"].mean().sort_values("occupancy_pct")
+        colors = [DANGER if value > 85 else WARNING if value > 75 else PRIMARY for value in average["occupancy_pct"]]
+        figure = go.Figure(go.Bar(x=average["occupancy_pct"], y=average["ward"], orientation="h", marker_color=colors))
+        figure.add_vline(x=85, line_dash="dash", line_color=DANGER, annotation_text="85% alert")
+        figure.update_layout(xaxis_title="Average occupancy (%)")
     else:
-        fig = px.scatter(df, x="marketing_spend", y="revenue", color="channel",
-                         trendline="ols", title="Spend vs Revenue by Channel")
-        fig.update_layout(height=300)
-        st.plotly_chart(fig, use_container_width=True)
+        figure = px.scatter(df, x="marketing_spend", y="revenue", color="channel", trendline="ols")
 
-    with st.expander("💡 Reveal Recommended Visual Story & Managerial Recommendation"):
-        callout_action(f"**Headline:** {case['story_title']}\n\nBuild 3 charts: context (overview), evidence (key pattern), recommendation (what to do). Keep the story to one slide per chart.", "Recommended Approach")
+    figure.update_layout(title=_case_headline(case_name, df), height=410, margin={"t": 70, "r": 25, "b": 45, "l": 55})
+    return figure
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  FULL QUIZ ZONE
-# ─────────────────────────────────────────────────────────────────────────────
-def render_quiz_zone():
-    hero("❓ Quiz Zone", "50+ questions across all 16 sessions. Test your data storytelling knowledge.")
-    filter_session = st.selectbox("Filter by session:", ["All"] + [str(i) for i in range(1, 17)], key="qz_sess")
-    filter_type = st.selectbox("Filter by type:", ["All", "MCQ", "TrueFalse", "Scenario"], key="qz_type")
+def render_case_library() -> None:
+    hero(
+        "📚 Business Case Library",
+        "Six guided cases with deterministic data, data-derived headlines, and management-focused questions.",
+    )
+    case_name = st.selectbox("Select case", list(CASES), key="case_name")
+    case = CASES[case_name]
+    df = case["loader"]().copy(deep=True)
 
-    qs = QUIZ_BANK
-    if filter_session != "All":
-        qs = [q for q in qs if q["session"] == int(filter_session)]
-    if filter_type != "All":
-        qs = [q for q in qs if q["type"] == filter_type]
+    context_tab, evidence_tab, response_tab = st.tabs(["Case brief", "Evidence", "Your response"])
+    with context_tab:
+        st.markdown("### Business context")
+        st.write(case["context"])
+        st.info(f"**Data-derived headline:** {_case_headline(case_name, df)}")
+        st.markdown("### Guided questions")
+        for number, question in enumerate(case["questions"], 1):
+            st.markdown(f"{number}. {question}")
 
-    st.info(f"Showing {len(qs)} questions.")
-    for i, q in enumerate(qs):
-        with st.expander(f"Q{i+1} | Session {q['session']} | {q['clo']} | {q['type']} — {q['q'][:60]}..."):
-            st.markdown(f"**{q['q']}**")
-            choice = st.radio("", q["options"], key=f"qz_q{i}", index=0)
-            if st.button("Reveal Answer", key=f"qz_ans{i}"):
-                if choice == q["answer"]:
-                    st.success(f"✅ Correct!\n\n{q['explanation']}")
+    with evidence_tab:
+        figure = _case_figure(case_name, df)
+        st.plotly_chart(figure, use_container_width=True, config={"displaylogo": False})
+        with st.expander("Inspect synthetic dataset"):
+            st.dataframe(df, use_container_width=True, hide_index=True)
+        st.download_button(
+            "Download case dataset",
+            df.to_csv(index=False).encode("utf-8"),
+            file_name=f"{_safe_filename(case_name)}.csv",
+            mime="text/csv",
+        )
+
+    with response_tab:
+        st.markdown("### Construct the managerial story")
+        for number, question in enumerate(case["questions"], 1):
+            st.text_area(question, key=f"case_{_safe_filename(case_name)}_{number}", height=80)
+        st.text_input("Action-oriented headline", key=f"case_headline_{_safe_filename(case_name)}")
+        st.text_area(
+            "Recommendation, owner, and deadline",
+            key=f"case_recommendation_{_safe_filename(case_name)}",
+            height=100,
+        )
+        with st.expander("Reveal a recommended approach"):
+            callout_action(
+                f"Start with the verified headline: **{_case_headline(case_name, df)}**. "
+                "Use one overview chart, one diagnostic chart, and one action statement. "
+                "Separate what the data proves from hypotheses that require further testing.",
+                "Recommended structure",
+            )
+
+
+def _question_id(question: dict[str, object]) -> str:
+    raw = f"{question['session']}|{question['type']}|{question['q']}"
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+
+
+def render_quiz_zone() -> None:
+    hero(
+        "❓ Quiz Zone",
+        "Filter questions by session and type. Selections remain attached to the correct question when filters change.",
+    )
+
+    filter_col, type_col = st.columns(2)
+    session_filter = filter_col.selectbox("Session", ["All"] + list(range(1, 17)), key="quiz_session_filter")
+    type_filter = type_col.selectbox("Question type", ["All", "MCQ", "TrueFalse", "Scenario"], key="quiz_type_filter")
+
+    questions = list(QUIZ_BANK)
+    if session_filter != "All":
+        questions = [question for question in questions if question["session"] == int(session_filter)]
+    if type_filter != "All":
+        questions = [question for question in questions if question["type"] == type_filter]
+
+    answered = 0
+    for question in questions:
+        qid = _question_id(question)
+        if st.session_state.get(f"quiz_choice_{qid}") is not None:
+            answered += 1
+
+    st.progress(answered / len(questions) if questions else 0, text=f"{answered} of {len(questions)} visible questions answered")
+
+    if not questions:
+        st.warning("No questions match the selected filters.")
+        return
+
+    for number, question in enumerate(questions, 1):
+        qid = _question_id(question)
+        title = f"Q{number} · Session {question['session']} · {question['clo']} · {question['type']}"
+        with st.expander(title):
+            st.markdown(f"**{question['q']}**")
+            choice = st.radio(
+                "Select your answer",
+                question["options"],
+                index=None,
+                key=f"quiz_choice_{qid}",
+            )
+            if st.button("Check answer", key=f"quiz_check_{qid}"):
+                st.session_state[f"quiz_revealed_{qid}"] = True
+
+            if st.session_state.get(f"quiz_revealed_{qid}", False):
+                if choice is None:
+                    st.warning("Select an option before checking the answer.")
+                elif choice == question["answer"]:
+                    st.success(f"Correct. {question['explanation']}", icon="✅")
                 else:
-                    st.error(f"❌ Correct answer: **{q['answer']}**\n\n{q['explanation']}")
+                    st.error(
+                        f"Correct answer: **{question['answer']}**\n\n{question['explanation']}",
+                        icon="❌",
+                    )
+
+    if st.button("Clear visible quiz responses"):
+        for question in questions:
+            qid = _question_id(question)
+            st.session_state.pop(f"quiz_choice_{qid}", None)
+            st.session_state.pop(f"quiz_revealed_{qid}", None)
+        st.rerun()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  RESOURCES PAGE
-# ─────────────────────────────────────────────────────────────────────────────
-def render_resources():
-    hero("🛠 Free Visualization Tools", "No paid software required for this course.")
-    tools = [
-        {
-            "name": "Tableau Public",
-            "url": "https://public.tableau.com",
-            "desc": "Industry-leading drag-and-drop visualization. Free for public dashboards. Excellent for practice.",
-            "best_for": "Interactive dashboards, maps, complex layouts",
-            "effort": "Medium learning curve"
-        },
-        {
-            "name": "Flourish",
-            "url": "https://flourish.studio",
-            "desc": "Browser-based, no-code. Templates for bar chart races, story maps, and scrollytelling.",
-            "best_for": "Animated charts, storytelling, quick prototypes",
-            "effort": "Very easy — no coding"
-        },
-        {
-            "name": "Datawrapper",
-            "url": "https://www.datawrapper.de",
-            "desc": "Used by newsrooms. Excellent for clean, publication-ready charts with minimal configuration.",
-            "best_for": "Line, bar, map charts for publication",
-            "effort": "Very easy — upload CSV and select template"
-        },
-        {
-            "name": "RAWGraphs",
-            "url": "https://rawgraphs.io",
-            "desc": "Open source. Specialises in unusual chart types: alluvial, bump, streamgraph, parallel coordinates.",
-            "best_for": "Exploring chart types beyond the standard set",
-            "effort": "Easy — drag and drop"
-        },
-        {
-            "name": "Google Sheets / Excel",
-            "url": "https://sheets.google.com",
-            "desc": "Familiar tools with powerful charting. Good for quick exploration and presentations.",
-            "best_for": "Quick charts embedded in reports and slide decks",
-            "effort": "Minimal — most students already know these"
-        },
-        {
-            "name": "Power BI Desktop",
-            "url": "https://powerbi.microsoft.com/desktop",
-            "desc": "Microsoft's free desktop BI tool. Excellent for business dashboards connected to data sources.",
-            "best_for": "Business dashboards, reports with multiple data sources",
-            "effort": "Medium — requires some setup"
-        },
+def render_resources() -> None:
+    hero(
+        "🛠 Visualization Resources",
+        "A focused set of tools for creating clear charts, dashboards, and visual stories.",
+    )
+
+    resources = [
+        (
+            "Tableau Public",
+            "https://public.tableau.com",
+            "Interactive dashboards, maps, and portfolio work. Public publishing is the default.",
+            "Intermediate",
+        ),
+        (
+            "Flourish",
+            "https://flourish.studio",
+            "Template-based animated charts, story maps, and scrollytelling without coding.",
+            "Beginner",
+        ),
+        (
+            "Datawrapper",
+            "https://www.datawrapper.de",
+            "Clean publication-ready charts and maps with strong defaults.",
+            "Beginner",
+        ),
+        (
+            "RAWGraphs",
+            "https://rawgraphs.io",
+            "Open-source exploration of alluvial, bump, streamgraph, and other less-common chart families.",
+            "Beginner–intermediate",
+        ),
+        (
+            "Google Sheets",
+            "https://sheets.google.com",
+            "Fast analysis and familiar charts for reports, group work, and classroom exercises.",
+            "Beginner",
+        ),
+        (
+            "Power BI Desktop",
+            "https://powerbi.microsoft.com/desktop",
+            "Business dashboards, data modelling, and reports connected to multiple sources.",
+            "Intermediate",
+        ),
     ]
-    cols = st.columns(2)
-    for i, tool in enumerate(tools):
-        with cols[i % 2]:
-            st.markdown(f"""
-            <div style="background:white;border:1px solid #E2EAF4;border-radius:10px;padding:1rem 1.2rem;margin-bottom:1rem;border-left:4px solid #1B4F8A;">
-            <h4 style="margin:0 0 0.3rem 0;color:#1B4F8A;">{tool['name']}</h4>
-            <p style="font-size:0.88rem;color:#4B5563;margin:0 0 0.4rem 0;">{tool['desc']}</p>
-            <p style="font-size:0.82rem;margin:0;"><strong>Best for:</strong> {tool['best_for']}</p>
-            <p style="font-size:0.82rem;margin:0.2rem 0 0 0;"><strong>Effort:</strong> {tool['effort']}</p>
-            <a href="{tool['url']}" target="_blank" style="font-size:0.82rem;color:#2563EB;">→ Open tool</a>
-            </div>
-            """, unsafe_allow_html=True)
-    callout_insight("You do not need all of these tools. Pick one (recommend Flourish or Datawrapper for beginners, Tableau for advanced) and get proficient. Depth beats breadth.", "Tool Strategy")
+
+    columns = st.columns(2)
+    for index, (name, url, description, level) in enumerate(resources):
+        with columns[index % 2]:
+            with st.container(border=True):
+                st.markdown(f"#### {name}")
+                st.write(description)
+                st.caption(f"Suggested level: {level}")
+                st.link_button("Open official website", url, use_container_width=True)
+
+    callout_insight(
+        "Choose one primary tool and learn its workflow deeply. Use this app to strengthen chart reasoning; use the external tool to strengthen production skill.",
+        "Tool strategy",
+    )
+    st.caption("External tools may change their plans or feature availability. Review the provider's current terms before use.")
