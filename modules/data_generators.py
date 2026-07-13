@@ -18,24 +18,33 @@ def _rng(seed: int) -> np.random.Generator:
 
 @st.cache_data(show_spinner=False)
 def retail_sales(seed: int = 101) -> pd.DataFrame:
+    """Return a two-year retail series with an intentional teaching narrative.
+
+    Year 1 rises by exactly 50% from January to December and peaks in
+    November, matching the action-title exercises used in Sessions 1 and 8.
+    """
     rng = _rng(seed)
     months = pd.date_range("2023-01-01", periods=24, freq="MS")
-    base = 120 + np.linspace(0, 40, 24)
-    seasonal = 15 * np.sin(np.linspace(0, 4 * np.pi, 24))
-    noise = rng.normal(0, 5, 24)
-    sales = (base + seasonal + noise).clip(80)
+    revenue = np.array(
+        [
+            110.0, 116.0, 123.0, 129.0, 136.0, 142.0,
+            148.0, 153.0, 158.0, 164.0, 172.0, 165.0,
+            121.0, 128.0, 135.0, 142.0, 150.0, 157.0,
+            163.0, 169.0, 175.0, 181.0, 190.0, 184.0,
+        ]
+    )
     return pd.DataFrame(
         {
             "month": months,
-            "revenue_lakhs": sales.round(1),
-            "units_sold": (sales * 4.2 + rng.normal(0, 20, 24)).astype(int).clip(300),
+            "revenue_lakhs": revenue,
+            "units_sold": (revenue * 4.2 + rng.normal(0, 12, 24)).astype(int).clip(300),
             "region": rng.choice(["North", "South", "East", "West"], 24),
         }
     )
 
 
 @st.cache_data(show_spinner=False)
-def regional_sales(seed: int = 202) -> pd.DataFrame:
+def regional_sales(seed: int = 18) -> pd.DataFrame:
     rng = _rng(seed)
     regions = ["North", "South", "East", "West", "Central"]
     categories = ["Electronics", "Apparel", "FMCG", "Furniture", "Sports"]
