@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from modules.data_generators import (
+    DATASETS,
     bed_occupancy,
     get_dataset,
     marketing_campaign,
@@ -9,6 +10,13 @@ from modules.data_generators import (
     student_performance,
     time_series_revenue,
 )
+
+
+def test_all_synthetic_datasets_generate_successfully():
+    for name, loader in DATASETS.items():
+        frame = loader()
+        assert isinstance(frame, pd.DataFrame), f"{name} did not return a DataFrame"
+        assert not frame.empty, f"{name} returned an empty DataFrame"
 
 
 def test_generators_are_deterministic():
