@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "storytelling-dataviz-gim"
-version = "2.0.0"
+version = "2.0.1"
 description = "Interactive teaching app for Storytelling using Data Visualization"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -14,7 +14,6 @@ dependencies = [
   "pandas>=2.2,<3.0",
   "numpy>=1.26,<3.0",
   "plotly>=6.0,<7.0",
-  "statsmodels>=0.14,<0.15",
 ]
 
 [project.optional-dependencies]
