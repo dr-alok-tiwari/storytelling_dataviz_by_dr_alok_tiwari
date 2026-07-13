@@ -1,3 +1,6 @@
+import plotly.express as px
+
+from modules.data_generators import scatter_sales_spend
 from modules.tools import get_recommendation
 
 
@@ -19,3 +22,15 @@ def test_recommendation_engine_covers_all_inputs():
 def test_many_category_composition_does_not_recommend_pie():
     recommendation = get_recommendation("Categorical", "Show composition", "Executive", category_count=12)
     assert "pie" not in recommendation.primary.lower()
+
+
+def test_plotly_ols_trendline_dependency_is_available():
+    frame = scatter_sales_spend()
+    figure = px.scatter(
+        frame,
+        x="marketing_spend",
+        y="revenue",
+        color="channel",
+        trendline="ols",
+    )
+    assert figure.data
