@@ -1,285 +1,227 @@
-"""
-Storytelling using Data Visualization
-PGDM-BDA Term 1 — Goa Institute of Management
-Interactive Teaching App · Dr. Alok Tiwari
-"""
+"""Production entry point for the Storytelling using Data Visualization app."""
+
+from __future__ import annotations
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="DataViz Storytelling | GIM BDA",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
+    menu_items={
+        "About": (
+            "Storytelling using Data Visualization — an interactive PGDM-BDA "
+            "teaching application developed by Dr. Alok Tiwari at Goa Institute "
+            "of Management. All datasets are synthetic."
+        )
+    },
 )
 
-from modules.ui_components import inject_css, footer
 from modules.home import render_home, render_roadmap
 from modules.sessions_1_8 import (
-    session_1, session_2, session_3, session_4,
-    session_5, session_6, session_7, session_8,
+    session_1,
+    session_2,
+    session_3,
+    session_4,
+    session_5,
+    session_6,
+    session_7,
+    session_8,
 )
 from modules.sessions_9_16 import (
-    session_9,  session_10, session_11, session_12,
-    session_13, session_14, session_15, session_16,
+    session_9,
+    session_10,
+    session_11,
+    session_12,
+    session_13,
+    session_14,
+    session_15,
+    session_16,
 )
 from modules.tools import (
-    render_chart_engine, render_storytelling_builder,
-    render_case_library, render_quiz_zone, render_resources,
+    render_case_library,
+    render_chart_engine,
+    render_quiz_zone,
+    render_resources,
+    render_storytelling_builder,
+)
+from modules.tools_runtime_patch import install as install_tools_runtime_patch
+from modules.ui_components import footer, inject_css
+
+
+APP_VERSION = "2.0.0"
+
+install_tools_runtime_patch()
+
+
+def _session_4_with_correction() -> None:
+    """Render Session 4 with an explicit correction to the legacy palette exercise."""
+    st.info(
+        "For wait-time targets, values **below** the maximum target are desirable; "
+        "values **above** target require attention. Use a diverging palette with the "
+        "target as the midpoint and label the direction explicitly.",
+        icon="ℹ️",
+    )
+    session_4()
+
+
+def _initialise_state() -> None:
+    """Create cross-page session state used by progress and accessibility controls."""
+    if "completed" not in st.session_state:
+        st.session_state.completed = {i: False for i in range(1, 17)}
+    else:
+        st.session_state.completed = {
+            i: bool(st.session_state.completed.get(i, False)) for i in range(1, 17)
+        }
+
+    st.session_state.setdefault("classroom_mode", False)
+    st.session_state.setdefault("reduce_motion", False)
+
+
+_initialise_state()
+
+home_page = st.Page(
+    render_home,
+    title="Home",
+    icon=":material/home:",
+    default=True,
+)
+roadmap_page = st.Page(
+    render_roadmap,
+    title="Course roadmap",
+    icon=":material/route:",
+    url_path="course-roadmap",
 )
 
-inject_css()
-
-
-def scroll_to_top():
-    """Reset the browser viewport to the top when a new app page is opened."""
-    components.html(
-        """
-        <script>
-        (function () {
-            const doc = window.parent.document;
-            const selectors = [
-                "html",
-                "body",
-                "section.main",
-                "div[data-testid='stAppViewContainer']",
-                "div[data-testid='stMain']",
-                "div[data-testid='stMainBlockContainer']"
-            ];
-
-            function topNow() {
-                try {
-                    window.parent.scrollTo(0, 0);
-                    selectors.forEach((selector) => {
-                        const el = doc.querySelector(selector);
-                        if (el) {
-                            el.scrollTop = 0;
-                        }
-                    });
-                } catch (err) {
-                    // Fail silently: this is a visual enhancement only.
-                }
-            }
-
-            topNow();
-            setTimeout(topNow, 50);
-            setTimeout(topNow, 150);
-            setTimeout(topNow, 300);
-        })();
-        </script>
-        """,
-        height=0,
-        width=0,
-    )
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  SIDEBAR CSS  — pure st.button styling, no overlay tricks
-# ─────────────────────────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-/* ── Sidebar background ───────────────────────────────── */
-section[data-testid="stSidebar"] {
-    background: #0D2137 !important;
-}
-section[data-testid="stSidebar"] > div:first-child {
-    padding-top: 0 !important;
+session_pages = {
+    1: st.Page(session_1, title="1. Why visualization matters", icon="📖", url_path="session-01"),
+    2: st.Page(session_2, title="2. Mapping data to visuals", icon="🔗", url_path="session-02"),
+    3: st.Page(session_3, title="3. Axes, scales & coordinates", icon="📐", url_path="session-03"),
+    4: st.Page(_session_4_with_correction, title="4. Color & visual attention", icon="🎨", url_path="session-04"),
+    5: st.Page(session_5, title="5. Visualizing amounts", icon="📊", url_path="session-05"),
+    6: st.Page(session_6, title="6. Distributions & variation", icon="📉", url_path="session-06"),
+    7: st.Page(session_7, title="7. Proportions & composition", icon="🥧", url_path="session-07"),
+    8: st.Page(session_8, title="8. Critiquing weak stories", icon="🔍", url_path="session-08"),
+    9: st.Page(session_9, title="9. Relationships & insight", icon="🔁", url_path="session-09"),
+    10: st.Page(session_10, title="10. Time series & change", icon="📈", url_path="session-10"),
+    11: st.Page(session_11, title="11. Dashboard storytelling", icon="🖥️", url_path="session-11"),
+    12: st.Page(session_12, title="12. Titles, annotation & flow", icon="✏️", url_path="session-12"),
+    13: st.Page(session_13, title="13. Storytelling pitfalls", icon="⚠️", url_path="session-13"),
+    14: st.Page(session_14, title="14. Strategy communication", icon="♟️", url_path="session-14"),
+    15: st.Page(session_15, title="15. Integrated workshop", icon="🔧", url_path="session-15"),
+    16: st.Page(session_16, title="16. Healthcare DataViz", icon="🏥", url_path="session-16"),
 }
 
-/* ── Every sidebar button: base style ────────────────── */
-section[data-testid="stSidebar"] .stButton > button {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-start !important;   /* LEFT-ALIGN text */
-    gap: 8px !important;
-    width: 100% !important;
-    padding: 9px 14px !important;
-    margin: 1px 0 !important;
-    border-radius: 8px !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    background: rgba(255,255,255,0.05) !important;
-    color: #CBD5E1 !important;
-    font-size: 0.87rem !important;
-    font-weight: 500 !important;
-    text-align: left !important;
-    line-height: 1.35 !important;
-    white-space: normal !important;
-    word-break: break-word !important;
-    transition: background 0.15s, color 0.15s !important;
-    box-shadow: none !important;
+tool_pages = {
+    "chart": st.Page(
+        render_chart_engine,
+        title="Chart selection engine",
+        icon=":material/insert_chart:",
+        url_path="chart-selection-engine",
+    ),
+    "story": st.Page(
+        render_storytelling_builder,
+        title="Storytelling builder",
+        icon=":material/edit_note:",
+        url_path="storytelling-builder",
+    ),
+    "cases": st.Page(
+        render_case_library,
+        title="Business case library",
+        icon=":material/library_books:",
+        url_path="business-cases",
+    ),
+    "quiz": st.Page(
+        render_quiz_zone,
+        title="Quiz zone",
+        icon=":material/quiz:",
+        url_path="quiz-zone",
+    ),
+    "resources": st.Page(
+        render_resources,
+        title="Resources & tools",
+        icon=":material/construction:",
+        url_path="resources",
+    ),
 }
 
-/* ── Hover ────────────────────────────────────────────── */
-section[data-testid="stSidebar"] .stButton > button:hover {
-    background: rgba(255,255,255,0.12) !important;
-    color: #FFFFFF !important;
-    border-color: rgba(255,255,255,0.18) !important;
+pages = {
+    "": [home_page, roadmap_page],
+    "Module 1 · Foundations": [session_pages[i] for i in range(1, 5)],
+    "Module 2 · Dashboard design": [session_pages[i] for i in range(5, 9)],
+    "Module 3 · Storytelling": [session_pages[i] for i in range(9, 13)],
+    "Module 4 · Business applications": [session_pages[i] for i in range(13, 17)],
+    "Practice tools": list(tool_pages.values()),
 }
 
-/* ── Active page button (data attribute set via st.button type trick) */
-/* We use a CSS class injected on the container div instead */
-section[data-testid="stSidebar"] .stButton > button[data-active="true"],
-section[data-testid="stSidebar"] .nav-active .stButton > button {
-    background: #2563EB !important;
-    color: #FFFFFF !important;
-    font-weight: 700 !important;
-    border-color: #3B82F6 !important;
-}
+# Make page objects available to Home and shared session controls without circular imports.
+st.session_state["_session_pages"] = session_pages
+st.session_state["_tool_pages"] = tool_pages
+st.session_state["_roadmap_page"] = roadmap_page
 
-/* ── Module label paragraphs ──────────────────────────── */
-section[data-testid="stSidebar"] p.mod-label {
-    font-size: 0.67rem !important;
-    font-weight: 800 !important;
-    letter-spacing: 0.07em !important;
-    text-transform: uppercase !important;
-    color: #475569 !important;
-    padding: 10px 6px 3px 6px !important;
-    margin: 0 !important;
-}
+current_page = st.navigation(pages, position="top")
 
-/* ── Divider ─────────────────────────────────────────── */
-section[data-testid="stSidebar"] hr {
-    border-color: rgba(255,255,255,0.08) !important;
-    margin: 8px 0 !important;
-}
-
-/* ── Progress text ────────────────────────────────────── */
-section[data-testid="stSidebar"] .prog-label {
-    font-size: 0.75rem !important;
-    color: #94A3B8 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ── Session state ─────────────────────────────────────────────────────────────
-if "completed" not in st.session_state:
-    st.session_state.completed = {i: False for i in range(1, 17)}
-if "page" not in st.session_state:
-    st.session_state.page = "Home"
-if "_last_rendered_page" not in st.session_state:
-    st.session_state._last_rendered_page = st.session_state.page
-
-if st.session_state.page != st.session_state._last_rendered_page:
-    st.session_state._last_rendered_page = st.session_state.page
-    scroll_to_top()
-
-# ── Nav data ──────────────────────────────────────────────────────────────────
-MODULES = [
-    ("Module 1 — Foundations", [
-        ("S1",  "📖 Why Visualization Matters",       1),
-        ("S2",  "🔗 Mapping Data to Visual Forms",    2),
-        ("S3",  "📐 Axes, Scales & Coordinates",      3),
-        ("S4",  "🎨 Color, Emphasis & Attention",     4),
-    ]),
-    ("Module 2 — Dashboard Design", [
-        ("S5",  "📊 Visualizing Amounts",             5),
-        ("S6",  "📉 Distributions & Variation",       6),
-        ("S7",  "🥧 Proportions & Composition",       7),
-        ("S8",  "🔍 Critiquing Weak Visual Stories",  8),
-    ]),
-    ("Module 3 — Storytelling", [
-        ("S9",  "🔁 Relationships & Insight",          9),
-        ("S10", "📈 Time Series & Change",            10),
-        ("S11", "🖥️ Dashboard Storytelling",          11),
-        ("S12", "✏️ Annotation, Titles & Narrative",  12),
-    ]),
-    ("Module 4 — Business Applications", [
-        ("S13", "⚠️ Pitfalls in Data Storytelling",  13),
-        ("S14", "♟️ Strategy Communication",           14),
-        ("S15", "🔧 Integrated Workshop",             15),
-        ("S16", "🏥 Healthcare DataViz",              16),
-    ]),
-]
-
-TOOLS = [
-    ("Engine",    "🧭 Chart Selection Engine"),
-    ("Story",     "📝 Storytelling Builder"),
-    ("Cases",     "📚 Business Case Library"),
-    ("Quiz",      "❓ Quiz Zone"),
-    ("Resources", "🛠️ Resources & Tools"),
-]
-
-
-def nav_btn(key, label, snum=None):
-    """Plain st.button. Active styling injected via surrounding div."""
-    is_active = st.session_state.page == key
-    done_mark = " ✓" if snum and st.session_state.completed.get(snum) else ""
-    display = label + done_mark
-
-    # Wrap in a div with class for CSS targeting
-    active_class = "nav-active" if is_active else "nav-inactive"
-    st.markdown(f'<div class="{active_class}">', unsafe_allow_html=True)
-
-    # Active button gets a type="primary" for visual distinction
-    btn_type = "primary" if is_active else "secondary"
-    if st.button(display, key=f"nb_{key}", use_container_width=True, type=btn_type):
-        st.session_state.page = key
-        st.rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-
-def section_label(text):
-    st.markdown(f'<p class="mod-label">{text}</p>', unsafe_allow_html=True)
-
-
-# ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Brand
-    st.markdown("""
-    <div style='text-align:center;padding:16px 8px 12px;
-                border-bottom:1px solid rgba(255,255,255,0.08);margin-bottom:6px;'>
-        <div style='font-size:2rem;line-height:1.1;'>📊</div>
-        <div style='font-size:0.98rem;font-weight:700;color:#E2E8F0;margin:6px 0 2px;'>
-            DataViz Storytelling</div>
-        <div style='font-size:0.73rem;color:#64748B;'>PGDM-BDA &nbsp;|&nbsp; GIM Goa</div>
-    </div>""", unsafe_allow_html=True)
-
-    nav_btn("Home",    "🏠 Home")
-    nav_btn("Roadmap", "🗺️ Course Roadmap")
-
-    for mod_label, items in MODULES:
-        section_label(mod_label)
-        for key, label, snum in items:
-            nav_btn(key, label, snum)
-
-    section_label("Tools &amp; Resources")
-    for key, label in TOOLS:
-        nav_btn(key, label)
-
-    # Progress
-    done_count = sum(st.session_state.completed.values())
-    st.markdown("<hr>", unsafe_allow_html=True)
     st.markdown(
-        f'<p class="prog-label" style="color:#94A3B8;font-size:.75rem;'
-        f'padding:2px 4px;">Sessions completed: '
-        f'<strong style="color:#E2E8F0;">{done_count} / 16</strong></p>',
+        """
+        <div class="sidebar-brand">
+            <div class="sidebar-brand-icon">📊</div>
+            <div>
+                <div class="sidebar-brand-title">DataViz Storytelling</div>
+                <div class="sidebar-brand-subtitle">PGDM-BDA · GIM Goa</div>
+            </div>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
-    st.progress(done_count / 16)
-    if done_count == 16:
-        st.success("🎉 All 16 sessions complete!", icon="🏆")
 
-# ── Router ────────────────────────────────────────────────────────────────────
-RENDER_MAP = {
-    "Home":    render_home,
-    "Roadmap": render_roadmap,
-    "S1": session_1,  "S2": session_2,  "S3": session_3,  "S4": session_4,
-    "S5": session_5,  "S6": session_6,  "S7": session_7,  "S8": session_8,
-    "S9": session_9,  "S10": session_10, "S11": session_11, "S12": session_12,
-    "S13": session_13, "S14": session_14, "S15": session_15, "S16": session_16,
-    "Engine":    render_chart_engine,
-    "Story":     render_storytelling_builder,
-    "Cases":     render_case_library,
-    "Quiz":      render_quiz_zone,
-    "Resources": render_resources,
-}
+    completed_count = sum(st.session_state.completed.values())
+    st.markdown("#### Course progress")
+    st.progress(completed_count / 16, text=f"{completed_count} of 16 sessions completed")
 
-render_fn = RENDER_MAP.get(st.session_state.page)
-if render_fn:
-    render_fn()
-else:
-    st.warning(f"Page not found: **{st.session_state.page}**")
-    render_home()
+    next_session = next(
+        (number for number, done in st.session_state.completed.items() if not done),
+        None,
+    )
+    if next_session is not None:
+        st.page_link(
+            session_pages[next_session],
+            label=f"Continue with Session {next_session}",
+            icon=":material/play_arrow:",
+            use_container_width=True,
+        )
+    else:
+        st.success("All sessions completed!", icon="🏆")
 
+    st.divider()
+    st.markdown("#### Display")
+    st.toggle(
+        "Classroom mode",
+        key="classroom_mode",
+        help="Enlarges body text, controls, tabs, and chart labels for projection.",
+    )
+    st.toggle(
+        "Reduce motion",
+        key="reduce_motion",
+        help="Disables non-essential transitions and animations.",
+    )
+
+    with st.expander("Progress options"):
+        if st.button("Reset course progress", use_container_width=True):
+            st.session_state.completed = {i: False for i in range(1, 17)}
+            for i in range(1, 17):
+                st.session_state.pop(f"session_complete_{i}", None)
+            st.rerun()
+        st.caption("Progress is stored only for the current browser session.")
+
+    st.divider()
+    st.caption(f"Version {APP_VERSION} · Synthetic educational data")
+
+inject_css(
+    classroom_mode=st.session_state.classroom_mode,
+    reduce_motion=st.session_state.reduce_motion,
+)
+
+current_page.run()
 footer()

@@ -1,151 +1,238 @@
 # 📊 Storytelling using Data Visualization
-### Interactive Teaching App
-**Goa Institute of Management | Dr. Alok Tiwari**
+
+A production-oriented, interactive teaching application for the **2-credit PGDM-BDA core course** at Goa Institute of Management.
+
+**Instructor:** Dr. Alok Tiwari  
+**Institution:** Goa Institute of Management, Goa  
+**Course design:** 16 sessions × 75 minutes  
+**Application version:** 2.0.0
+
+> All datasets in the application are deterministic and synthetic. They do not represent real students, patients, organisations, or financial records. Healthcare examples are for education only and are not clinical guidance.
 
 ---
 
-## Overview
+## What the app provides
 
-This is a fully self-contained, classroom-ready Streamlit application for the
-2-credit PGDM-BDA core course *Storytelling using Data Visualization*. It covers
-all 16 sessions (75 minutes each) across four modules, requiring no external
-data files, API keys, or paid tools.
+- 16 fully developed course sessions across four modules
+- Stable, shareable page URLs for every session and practice tool
+- Concept, demonstration, lab, quiz, and reflection activities
+- Working session-completion tracking for the current browser session
+- Previous, roadmap, and next-session controls
+- Classroom mode for larger projected text and controls
+- Reduced-motion accessibility preference
+- Deterministic synthetic datasets that remain consistent across reruns
+- Chart Selection Engine with coverage for every input combination
+- Storytelling Framework Builder with validation and text export
+- Six management case studies with data-derived headlines
+- Stable quiz state when filters change
+- Downloadable CSV datasets and story summaries
+- Responsive design for desktop, tablet, and mobile-width screens
+- Automated tests and GitHub Actions quality checks
 
 ---
 
-## Quick Start
+## Course modules
 
-### 1. Clone or copy the project
+| Module | Sessions | Theme |
+|---|---:|---|
+| Module 1 | 1–4 | Foundations of data visualization |
+| Module 2 | 5–8 | Dashboard design and visual communication |
+| Module 3 | 9–12 | Storytelling with data |
+| Module 4 | 13–16 | Business, strategy, and healthcare applications |
+
+Each standard session follows this structure:
+
+1. **Concept** — principles and managerial context
+2. **Demo** — interactive worked examples
+3. **Lab** — guided application activity
+4. **Quiz** — formative assessment with explanations
+5. **Reflect** — personal application and session completion
+
+---
+
+## Quick start
+
+### 1. Clone the repository
 
 ```bash
-# If using git
-git clone <your-repo-url>
-cd dataviz_app
-
-# Or simply unzip the folder and cd into it
-cd dataviz_app
+git clone https://github.com/dr-alok-tiwari/storytelling_dataviz_by_dr_alok_tiwari.git
+cd storytelling_dataviz_by_dr_alok_tiwari
 ```
 
-### 2. Create a virtual environment (recommended)
+### 2. Create a virtual environment
 
 ```bash
-python -m venv venv
-source venv/bin/activate        # Linux / macOS
-venv\Scripts\activate           # Windows
+python -m venv .venv
+```
+
+Activate it:
+
+```bash
+# macOS / Linux
+source .venv/bin/activate
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
 ```
 
 ### 3. Install dependencies
 
 ```bash
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Run the app
+### 4. Run the application
 
 ```bash
 streamlit run app.py
 ```
 
-The app opens automatically at `http://localhost:8501`.
+Open the local URL displayed by Streamlit, normally `http://localhost:8501`.
 
 ---
 
-## Project Structure
+## Development installation
 
-```
-dataviz_app/
-│
-├── app.py                    ← Main entry point & sidebar router
-├── requirements.txt          ← Python dependencies
-├── README.md                 ← This file
-│
-└── modules/
-    ├── __init__.py
-    ├── ui_components.py      ← CSS, color palette, callout helpers, footer
-    ├── data_generators.py    ← 11 synthetic in-memory datasets
-    ├── home.py               ← Landing page & Course Roadmap
-    ├── sessions_1_8.py       ← Sessions 1–8 (Modules 1 & 2)
-    ├── sessions_9_16.py      ← Sessions 9–16 (Modules 3 & 4)
-    ├── quiz_bank.py          ← 50+ quiz questions (MCQ, T/F, scenario)
-    └── tools.py              ← Chart Engine, Story Builder, Cases, Quiz Zone, Resources
+To install testing and linting tools:
+
+```bash
+pip install -e ".[dev]"
 ```
 
----
+Run quality checks:
 
-## Course Modules
+```bash
+ruff check app.py modules/data_generators.py modules/home.py modules/tools.py modules/tools_runtime_patch.py modules/ui_components.py tests --select E9,F63,F7,F82 --ignore E402,F401
+pytest
+```
 
-| Module | Sessions | Theme |
-|--------|----------|-------|
-| 1 | 1–4  | Foundations of Data Visualization |
-| 2 | 5–8  | Dashboard Design & Visual Communication |
-| 3 | 9–12 | Storytelling with Data |
-| 4 | 13–16 | Business & Strategy Applications |
+The test suite checks:
 
----
-
-## Features
-
-- **16 fully developed session pages** — each with Concept, Demo, Lab, Quiz, and Reflection tabs
-- **Chart Selection Engine** — recommends chart types by data type, question, and audience
-- **Storytelling Framework Builder** — 8-step narrative builder with text export
-- **Business Case Library** — 6 cases (Sales, Marketing, Operations, Finance, Healthcare, Strategy)
-- **Quiz Zone** — 50+ questions with instant answer reveal and CLO tagging
-- **Misleading Chart Clinic** — before/after redesign examples built into Session 8 & 13
-- **Final Integrated Workshop** — end-to-end visual story build (Session 15)
-- **Healthcare Dashboard** — purpose-built session for HCM/healthcare analytics students (Session 16)
-- **Session progress tracker** — sidebar checkboxes with completion bar
-- **Downloadable outputs** — CSV datasets and storyboard summaries
+- application smoke rendering;
+- deterministic dataset generation;
+- correct year-on-year growth calculations;
+- occupancy reconciliation;
+- cost-per-lead units;
+- score-derived student grades;
+- full Chart Selection Engine input coverage.
 
 ---
 
-## Technology Stack
+## Project structure
 
-| Library | Purpose |
-|---------|---------|
-| streamlit ≥ 1.32 | UI framework |
-| pandas ≥ 2.0 | Data manipulation |
-| numpy ≥ 1.24 | Numerical generation |
-| plotly ≥ 5.18 | Interactive charts |
-| altair ≥ 5.0 | Declarative charts |
-| matplotlib ≥ 3.7 | Static figures |
-| scikit-learn ≥ 1.3 | Illustrative ML examples |
-
-No API keys. No paid services. No external data files.
-
----
-
-## Classroom Usage Notes
-
-- **Projection mode:** use wide layout (already set) at 1280×720 or higher
-- **Font size:** increase browser zoom to 110–125% for rear-row visibility
-- **Session flow:** each session is designed for a 75-minute class:
-  - 10 min — Concept tab (instructor-led)
-  - 20 min — Demo tab (live walkthrough)
-  - 20 min — Lab tab (student activity)
-  - 10 min — Quiz tab (discussion)
-  - 10 min — Reflection tab + summary
-  - 5 min  — Wrap-up / questions
-- **Progress tracking:** students check the session-complete box at the end; progress shows in sidebar
-
----
-
-## Suggested Improvements (Future Versions)
-
-1. Add st-aggrid for richer data tables in the workshop
-2. Integrate Lottie animations for concept introductions
-3. Add a PDF export button for storyboard summaries
-4. Connect an optional Google Sheets import for live classroom data
-5. Add a leaderboard for quiz scores using st.session_state
-6. Build a peer-critique mode where students submit redesigns
-7. Add a dark/light theme toggle
-8. Package as a Docker container for zero-install classroom deployment
+```text
+storytelling_dataviz_by_dr_alok_tiwari/
+├── app.py                         # Application router and shared shell
+├── requirements.txt              # Streamlit Cloud dependencies
+├── pyproject.toml                 # Package, lint, and test configuration
+├── README.md
+├── LICENSE.md
+├── .gitignore
+├── .streamlit/
+│   └── config.toml                # Theme, accessibility, and server settings
+├── .github/
+│   └── workflows/
+│       └── quality.yml            # CI lint and test workflow
+├── modules/
+│   ├── __init__.py
+│   ├── ui_components.py           # Design system and shared components
+│   ├── data_generators.py         # Deterministic synthetic datasets
+│   ├── home.py                    # Landing page and roadmap
+│   ├── sessions_1_8.py            # Modules 1 and 2
+│   ├── sessions_9_16.py           # Modules 3 and 4
+│   ├── quiz_bank.py               # Question bank
+│   ├── tools.py                   # Chart, story, case, quiz, and resource tools
+│   └── tools_runtime_patch.py     # Exact recommendation/example alignment
+└── tests/
+    ├── test_app_smoke.py
+    ├── test_data_generators.py
+    └── test_tools.py
+```
 
 ---
 
-## License & Attribution
+## Production design decisions
 
-Developed for academic use at Goa Institute of Management (GIM), Panaji, Goa.
-All datasets are synthetically generated and do not represent any real individuals
-or organizations.
+### Native navigation
 
-**Instructor:** Dr. Alok Tiwari, Assistant Professor — Big Data Analytics, GIM
+The application uses `st.navigation` and `st.Page` rather than a custom button router. This provides:
+
+- stable URLs;
+- browser navigation support;
+- grouped course modules;
+- a cleaner responsive navigation experience;
+- less dependence on undocumented Streamlit DOM selectors.
+
+### Deterministic data
+
+Each dataset uses its own fixed random seed and `st.cache_data`. Therefore:
+
+- charts do not unexpectedly change after widget interactions;
+- model answers remain aligned with examples;
+- downloads match the displayed chart;
+- students see reproducible classroom results.
+
+### Accessible visual system
+
+The committed `.streamlit/config.toml` and shared CSS provide:
+
+- 17 px base typography;
+- higher-contrast sidebar text;
+- responsive heading sizes;
+- minimum control heights;
+- classroom enlargement mode;
+- reduced-motion support;
+- system-font fallbacks without an external font dependency.
+
+### Honest educational outputs
+
+Management case headlines and key findings are derived from the current deterministic dataset instead of being hard-coded. This prevents the narrative from contradicting the displayed evidence.
+
+---
+
+## Streamlit Community Cloud deployment
+
+1. Push the repository to GitHub.
+2. Sign in to Streamlit Community Cloud.
+3. Select **Create app**.
+4. Choose this repository and the target branch.
+5. Set the main file path to:
+
+```text
+app.py
+```
+
+6. Deploy.
+
+No API keys, secrets, paid services, or external data files are required.
+
+---
+
+## Classroom use
+
+For projection:
+
+- turn on **Classroom mode** in the sidebar;
+- use a display resolution of at least 1280 × 720;
+- keep the browser at normal zoom unless the physical room requires additional enlargement;
+- share the direct session URL with students before class;
+- remind students that completion progress is stored for the current browser session only.
+
+---
+
+## Data and privacy
+
+- The app does not require authentication.
+- It does not collect or transmit student responses to an external database.
+- Text entries and progress use Streamlit session state and are not durable records.
+- Downloaded files are generated locally from synthetic educational content.
+- Do not enter personal, confidential, patient-identifiable, or institutionally restricted information into public deployments.
+
+---
+
+## License and attribution
+
+Copyright © 2026 Dr. Alok Tiwari. All rights reserved.
+
+Educational use is permitted subject to the conditions in [LICENSE.md](LICENSE.md). Attribution to Dr. Alok Tiwari and Goa Institute of Management must be retained.

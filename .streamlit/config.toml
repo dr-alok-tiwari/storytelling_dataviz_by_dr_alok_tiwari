@@ -1,0 +1,32 @@
+[theme]
+base = "light"
+primaryColor = "#1B4F8A"
+backgroundColor = "#F7F9FC"
+secondaryBackgroundColor = "#EEF3F8"
+textColor = "#17212B"
+font = "sans-serif"
+baseFontSize = 17
+baseRadius = "0.6rem"
+buttonRadius = "0.55rem"
+showSidebarBorder = true
+showWidgetBorder = true
+chartCategoricalColors = ["#1B4F8A", "#0F766E", "#6D3A8D", "#C77C02", "#C0392B", "#4F6D7A"]
+chartSequentialColors = ["#F5FAFE", "#E7F2FA", "#D5E8F5", "#BAD9EC", "#94C3DF", "#6EABD1", "#4A91C2", "#3175AA", "#245F91", "#1B4F8A"]
+
+[theme.sidebar]
+backgroundColor = "#102A43"
+secondaryBackgroundColor = "#173B5E"
+textColor = "#F8FAFC"
+primaryColor = "#7DB7E8"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = true
+runOnSave = false
+maxUploadSize = 25
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = "stacktrace"
