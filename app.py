@@ -46,10 +46,24 @@ from modules.tools import (
     render_resources,
     render_storytelling_builder,
 )
+from modules.tools_runtime_patch import install as install_tools_runtime_patch
 from modules.ui_components import footer, inject_css
 
 
 APP_VERSION = "2.0.0"
+
+install_tools_runtime_patch()
+
+
+def _session_4_with_correction() -> None:
+    """Render Session 4 with an explicit correction to the legacy palette exercise."""
+    st.info(
+        "For wait-time targets, values **below** the maximum target are desirable; "
+        "values **above** target require attention. Use a diverging palette with the "
+        "target as the midpoint and label the direction explicitly.",
+        icon="ℹ️",
+    )
+    session_4()
 
 
 def _initialise_state() -> None:
@@ -84,7 +98,7 @@ session_pages = {
     1: st.Page(session_1, title="1. Why visualization matters", icon="📖", url_path="session-01"),
     2: st.Page(session_2, title="2. Mapping data to visuals", icon="🔗", url_path="session-02"),
     3: st.Page(session_3, title="3. Axes, scales & coordinates", icon="📐", url_path="session-03"),
-    4: st.Page(session_4, title="4. Color & visual attention", icon="🎨", url_path="session-04"),
+    4: st.Page(_session_4_with_correction, title="4. Color & visual attention", icon="🎨", url_path="session-04"),
     5: st.Page(session_5, title="5. Visualizing amounts", icon="📊", url_path="session-05"),
     6: st.Page(session_6, title="6. Distributions & variation", icon="📉", url_path="session-06"),
     7: st.Page(session_7, title="7. Proportions & composition", icon="🥧", url_path="session-07"),
