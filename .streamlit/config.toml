@@ -11,7 +11,7 @@ buttonRadius = "0.55rem"
 showSidebarBorder = true
 showWidgetBorder = true
 chartCategoricalColors = ["#1B4F8A", "#0F766E", "#6D3A8D", "#C77C02", "#C0392B", "#4F6D7A"]
-chartSequentialColors = ["#EEF5FB", "#D6E7F5", "#A9CEE8", "#6BA7D1", "#347FB5", "#1B4F8A"]
+chartSequentialColors = ["#F5FAFE", "#E7F2FA", "#D5E8F5", "#BAD9EC", "#94C3DF", "#6EABD1", "#4A91C2", "#3175AA", "#245F91", "#1B4F8A"]
 
 [theme.sidebar]
 backgroundColor = "#102A43"
