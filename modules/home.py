@@ -1,186 +1,336 @@
-"""
-home.py
-Landing page, course roadmap, and course overview.
-"""
-import streamlit as st
-import plotly.graph_objects as go
+"""Landing page and course roadmap."""
+
+from __future__ import annotations
+
+from html import escape
+
 import pandas as pd
+import plotly.graph_objects as go
+import streamlit as st
 
 from modules.ui_components import (
-    callout_insight, footer, PRIMARY, ACCENT, SUCCESS, DANGER,
-    SESSION_TITLES, SESSION_MODULE, MODULE_LABELS, MODULE_COLORS, SESSION_CLO
+    ACCENT,
+    DANGER,
+    MODULE_COLORS,
+    MODULE_LABELS,
+    PRIMARY,
+    SESSION_CLO,
+    SESSION_MODULE,
+    SESSION_TITLES,
+    SUCCESS,
+    callout_insight,
+    hero,
 )
 
-WARNING = "#E67E22"
+WARNING = "#B85C00"
 
 
-def render_home():
-    st.markdown("""
-    <div class="hero-strip">
-        <h1>📊 Storytelling using Data Visualization</h1>
-        <p>PGDM-BDA Core Course &nbsp;·&nbsp; 2 Credits &nbsp;·&nbsp; 16 Sessions × 75 Minutes
-        &nbsp;·&nbsp; Goa Institute of Management</p>
-    </div>
-    """, unsafe_allow_html=True)
+def _completion_summary() -> tuple[int, int | None]:
+    completed = st.session_state.get("completed", {i: False for i in range(1, 17)})
+    count = sum(bool(completed.get(i, False)) for i in range(1, 17))
+    next_session = next((i for i in range(1, 17) if not completed.get(i, False)), None)
+    return count, next_session
 
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.markdown("### About This Course")
-        st.write("""
-        Data without communication is noise. This course teaches PGDM-BDA students
-        how to transform analysis into decisions — by selecting the right chart,
-        designing honest and clear visuals, and building narratives that move people
-        from 'interesting data' to 'clear action'.
 
-        By the end, you will be able to critique a weak dashboard, redesign a
-        misleading chart, and build a complete visual story from raw data to
-        a board-ready recommendation.
-        """)
-        st.markdown("### 🎓 Instructor")
-        st.markdown("**Dr. Alok Tiwari** — Assistant Professor, Big Data Analytics")
-        st.markdown("Goa Institute of Management, Panaji, Goa")
-        st.markdown("*PhD (Biomedical Engineering, IIT-BHU) · Research: Medical Imaging AI, MLOps, Healthcare Analytics*")
+def _quick_start() -> None:
+    completed_count, next_session = _completion_summary()
+    session_pages = st.session_state.get("_session_pages", {})
+    tool_pages = st.session_state.get("_tool_pages", {})
 
-    with col2:
-        st.markdown("### 📋 How to Use This App")
-        steps = [
-            ("Sidebar", "Navigate to any session or tool"),
-            ("Concept tab", "Read the concept explanation"),
-            ("Demo tab", "Interact with live charts"),
-            ("Lab tab", "Complete hands-on activities"),
-            ("Quiz tab", "Test your knowledge"),
-            ("Reflect tab", "Apply to your context"),
+    st.markdown("### Continue learning")
+    progress_col, action_col = st.columns([1.5, 1])
+    with progress_col:
+        st.progress(
+            completed_count / 16,
+            text=f"{completed_count} of 16 sessions completed",
+        )
+        if completed_count == 0:
+            st.caption("Begin with Session 1, or use the roadmap to explore the full course.")
+        elif completed_count == 16:
+            st.success("You have completed the full course.", icon="🏆")
+        else:
+            st.caption("Progress is stored for the current browser session.")
+
+    with action_col:
+        if next_session is not None and next_session in session_pages:
+            label = "Start Session 1" if next_session == 1 else f"Continue Session {next_session}"
+            st.page_link(
+                session_pages[next_session],
+                label=label,
+                icon=":material/play_arrow:",
+                use_container_width=True,
+            )
+        roadmap_page = st.session_state.get("_roadmap_page")
+        if roadmap_page is not None:
+            st.page_link(
+                roadmap_page,
+                label="Open course roadmap",
+                icon=":material/route:",
+                use_container_width=True,
+            )
+
+    if tool_pages:
+        st.markdown("#### Practice tools")
+        columns = st.columns(3)
+        shortcuts = [
+            ("chart", "Choose the right chart", ":material/insert_chart:"),
+            ("story", "Build a data story", ":material/edit_note:"),
+            ("quiz", "Test your knowledge", ":material/quiz:"),
         ]
-        for label, desc in steps:
-            st.markdown(f"**{label}** — {desc}")
-
-    st.markdown("---")
-    st.markdown("### 🎯 Course Learning Outcomes")
-    clos = [
-        ("CLO1", "Explain the role of data visualization in presenting analytics-driven solutions to management problems.", "🔍"),
-        ("CLO2", "Select and design appropriate charts, dashboards, and visual layouts for different business contexts.", "📐"),
-        ("CLO3", "Construct coherent and decision-oriented narratives from data using visualization tools and frameworks.", "📖"),
-        ("CLO4", "Communicate business insights and strategic recommendations effectively through visual stories.", "🎯"),
-    ]
-    cols = st.columns(4)
-    for col, (clo, desc, icon) in zip(cols, clos):
-        col.markdown(f"""
-        <div style="background:white;border:1px solid #E2EAF4;border-radius:10px;
-                    padding:1rem;text-align:center;border-top:4px solid {PRIMARY};
-                    box-shadow:0 2px 6px rgba(0,0,0,0.06);height:180px;">
-        <div style="font-size:1.8rem;">{icon}</div>
-        <div style="font-weight:700;color:{PRIMARY};font-size:1rem;">{clo}</div>
-        <div style="font-size:0.82rem;color:#4B5563;margin-top:0.4rem;">{desc}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.markdown("### 📅 16-Session Course Roadmap")
-    mod_cols = st.columns(4)
-    for mod_num, col in enumerate(mod_cols, 1):
-        sessions = [s for s, m in SESSION_MODULE.items() if m == mod_num]
-        color = MODULE_COLORS[mod_num]
-        col.markdown(f"""
-        <div style="background:{color};color:white;border-radius:8px;padding:0.6rem 0.8rem;
-                    font-weight:600;font-size:0.88rem;margin-bottom:0.5rem;">
-        {MODULE_LABELS[mod_num]}
-        </div>
-        """, unsafe_allow_html=True)
-        for s in sessions:
-            col.markdown(f"""
-            <div style="background:white;border:1px solid #E2EAF4;border-left:3px solid {color};
-                        border-radius:6px;padding:0.5rem 0.7rem;margin-bottom:0.4rem;font-size:0.8rem;">
-            <strong style="color:{color};">S{s}</strong> — {SESSION_TITLES[s]}
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.markdown("### 🗺 CLO-Session Mapping")
-    mapping_df = pd.DataFrame({
-        "Session": list(SESSION_TITLES.keys()),
-        "Topic": list(SESSION_TITLES.values()),
-        "Module": [MODULE_LABELS[SESSION_MODULE[s]] for s in SESSION_TITLES],
-        "CLO": [SESSION_CLO[s] for s in SESSION_TITLES],
-    })
-    st.dataframe(mapping_df, use_container_width=True, hide_index=True)
+        for column, (key, label, icon) in zip(columns, shortcuts):
+            if key in tool_pages:
+                with column:
+                    st.page_link(
+                        tool_pages[key],
+                        label=label,
+                        icon=icon,
+                        use_container_width=True,
+                    )
 
 
-def render_roadmap():
-    st.markdown("""
-    <div class="hero-strip">
-        <h1>🗺 Course Roadmap</h1>
-        <p>Interactive overview of all 16 sessions — topics, modules, and CLO mapping.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Timeline chart
-    sessions = list(SESSION_TITLES.keys())
-    titles = [f"S{s}: {SESSION_TITLES[s][:35]}..." if len(SESSION_TITLES[s]) > 35
-              else f"S{s}: {SESSION_TITLES[s]}" for s in sessions]
-    modules = [SESSION_MODULE[s] for s in sessions]
-    colors = [MODULE_COLORS[m] for m in modules]
-    clos = [SESSION_CLO[s] for s in sessions]
-
-    fig = go.Figure()
-    for i, (s, title, color, clo) in enumerate(zip(sessions, titles, colors, clos)):
-        fig.add_trace(go.Scatter(
-            x=[i + 1], y=[SESSION_MODULE[s]],
-            mode="markers+text",
-            marker=dict(size=32, color=color, symbol="circle",
-                        line=dict(color="white", width=2)),
-            text=[str(s)],
-            textfont=dict(color="white", size=12, family="Inter"),
-            textposition="middle center",
-            hovertext=f"Session {s}: {SESSION_TITLES[s]}<br>{clo}",
-            hoverinfo="text",
-            showlegend=False,
-        ))
-
-    fig.update_layout(
-        title="Course Journey — 16 Sessions Across 4 Modules",
-        xaxis=dict(title="Session Number", tickvals=list(range(1, 17)),
-                   ticktext=[str(i) for i in range(1, 17)]),
-        yaxis=dict(title="Module", tickvals=[1, 2, 3, 4],
-                   ticktext=["M1: Foundations", "M2: Dashboard", "M3: Storytelling", "M4: Strategy"]),
-        height=380, plot_bgcolor="#F8FAFC",
+def render_home() -> None:
+    hero(
+        "📊 Storytelling using Data Visualization",
+        "PGDM-BDA core course · 2 credits · 16 sessions × 75 minutes · Goa Institute of Management",
     )
 
-    # Add module background bands
-    for mod, (y0, y1, color, label) in enumerate(
-        [(0.5, 1.5, "#EBF5FB", "Foundations"),
-         (1.5, 2.5, "#E9F7EF", "Dashboard"),
-         (2.5, 3.5, "#F5EEF8", "Storytelling"),
-         (3.5, 4.5, "#FDEDEC", "Strategy")], 1
-    ):
-        fig.add_hrect(y0=y0, y1=y1, fillcolor=color, line_width=0, layer="below")
+    _quick_start()
+    st.divider()
 
-    st.plotly_chart(fig, use_container_width=True)
-    callout_insight("The course builds progressively: foundations → design → storytelling → strategy. Each module's sessions are scaffolded so later sessions assume earlier learning.", "Scaffolded Design")
+    about_col, use_col = st.columns([1.6, 1])
+    with about_col:
+        st.markdown("### About this course")
+        st.write(
+            """
+            Data without communication is noise. This course helps students transform
+            analysis into decisions by selecting the right chart, designing honest and
+            accessible visuals, and constructing narratives that move an audience from
+            **evidence** to **insight** to **action**.
 
-    # 75-minute session flow
-    st.markdown("### ⏱ Typical 75-Minute Session Flow")
-    flow = [
-        ("0–5 min", "Warm-up / Prior session recap", SUCCESS),
-        ("5–20 min", "Concept explanation + class discussion", PRIMARY),
-        ("20–40 min", "Live demo + guided chart building", "#7D3C98"),
-        ("40–60 min", "Lab exercise (individual or group)", WARNING),
-        ("60–70 min", "Class discussion + critique", ACCENT),
-        ("70–75 min", "Quiz + reflection", DANGER),
+            By the end of the course, students should be able to critique a weak
+            dashboard, redesign a misleading chart, and build a complete visual story
+            from raw data to a management-ready recommendation.
+            """
+        )
+        st.markdown("#### Instructor")
+        st.markdown("**Dr. Alok Tiwari**  ")
+        st.markdown("Assistant Professor — Big Data Analytics, Goa Institute of Management")
+        st.caption(
+            "PhD, Biomedical Engineering (IIT-BHU) · Research interests: medical imaging AI, "
+            "MLOps, healthcare analytics, and responsible data communication"
+        )
+
+    with use_col:
+        st.markdown("### How to use the app")
+        steps = [
+            ("1", "Learn", "Read the concept and inspect the worked examples."),
+            ("2", "Explore", "Change controls and observe how the visual story changes."),
+            ("3", "Apply", "Complete the lab using the supplied synthetic dataset."),
+            ("4", "Check", "Attempt the quiz before revealing the explanation."),
+            ("5", "Reflect", "Record one insight and mark the session complete."),
+        ]
+        for number, label, description in steps:
+            st.markdown(f"**{number}. {label}** — {description}")
+
+    st.divider()
+    st.markdown("### Course learning outcomes")
+    clos = [
+        (
+            "CLO1",
+            "Explain how data visualization supports analytics-driven management decisions.",
+            "🔍",
+        ),
+        (
+            "CLO2",
+            "Select and design appropriate charts, dashboards, and visual layouts.",
+            "📐",
+        ),
+        (
+            "CLO3",
+            "Construct coherent, decision-oriented narratives from data and visual evidence.",
+            "📖",
+        ),
+        (
+            "CLO4",
+            "Communicate business insights and recommendations through persuasive visual stories.",
+            "🎯",
+        ),
     ]
-    for time, activity, color in flow:
-        st.markdown(f"""
-        <div style="display:flex;align-items:center;margin-bottom:0.5rem;">
-        <div style="background:{color};color:white;border-radius:4px;padding:0.2rem 0.6rem;
-                    font-size:0.8rem;min-width:90px;text-align:center;font-weight:600;">{time}</div>
-        <div style="margin-left:0.8rem;font-size:0.9rem;">{activity}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    columns = st.columns(4)
+    for column, (clo, description, icon) in zip(columns, clos):
+        column.markdown(
+            f"""
+            <div class="content-card" style="border-top:4px solid {PRIMARY}; text-align:center;">
+                <div style="font-size:1.8rem;" aria-hidden="true">{icon}</div>
+                <div style="font-weight:760;color:{PRIMARY};font-size:1.1rem;">{clo}</div>
+                <div style="font-size:.95rem;color:#405267;margin-top:.45rem;line-height:1.5;">
+                    {escape(description)}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    st.markdown("---")
-    st.markdown("### 📊 Assessment Alignment")
-    assess = pd.DataFrame({
-        "Component": ["In-class Quizzes (5)", "Mini-Labs (8)", "Business Case Analysis (3)", "Final Visual Story Project", "Class Participation"],
-        "Weight": ["15%", "20%", "25%", "30%", "10%"],
-        "CLOs Assessed": ["CLO1, CLO2", "CLO2, CLO3", "CLO3, CLO4", "CLO1–CLO4", "All CLOs"],
-    })
-    st.dataframe(assess, use_container_width=True, hide_index=True)
+    st.divider()
+    st.markdown("### Four-module learning journey")
+    session_pages = st.session_state.get("_session_pages", {})
+    module_columns = st.columns(4)
+    for module_number, column in enumerate(module_columns, 1):
+        color = MODULE_COLORS[module_number]
+        sessions = [session for session, module in SESSION_MODULE.items() if module == module_number]
+        with column:
+            st.markdown(
+                f"""
+                <div style="background:{color};color:white;border-radius:.65rem;padding:.7rem .85rem;
+                            font-weight:720;margin-bottom:.55rem;">
+                    {escape(MODULE_LABELS[module_number])}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            for session in sessions:
+                if session in session_pages:
+                    st.page_link(
+                        session_pages[session],
+                        label=f"S{session}: {SESSION_TITLES[session]}",
+                        use_container_width=True,
+                    )
+
+    st.divider()
+    st.markdown("### CLO–session mapping")
+    mapping_df = pd.DataFrame(
+        {
+            "Session": list(SESSION_TITLES),
+            "Topic": list(SESSION_TITLES.values()),
+            "Module": [MODULE_LABELS[SESSION_MODULE[s]] for s in SESSION_TITLES],
+            "CLO": [SESSION_CLO[s] for s in SESSION_TITLES],
+        }
+    )
+    st.dataframe(mapping_df, use_container_width=True, hide_index=True)
+    st.caption("All examples and downloadable datasets in the app are synthetic and intended for education.")
+
+
+def render_roadmap() -> None:
+    hero(
+        "🗺 Course Roadmap",
+        "A progressive 16-session journey from visual foundations to strategic and healthcare applications.",
+    )
+
+    sessions = list(SESSION_TITLES)
+    modules = [SESSION_MODULE[session] for session in sessions]
+    colors = [MODULE_COLORS[module] for module in modules]
+
+    figure = go.Figure()
+    for index, (session, color) in enumerate(zip(sessions, colors), start=1):
+        figure.add_trace(
+            go.Scatter(
+                x=[index],
+                y=[SESSION_MODULE[session]],
+                mode="markers+text",
+                marker={
+                    "size": 34,
+                    "color": color,
+                    "symbol": "circle",
+                    "line": {"color": "white", "width": 2},
+                },
+                text=[str(session)],
+                textfont={"color": "white", "size": 13},
+                textposition="middle center",
+                hovertemplate=(
+                    f"<b>Session {session}</b><br>{SESSION_TITLES[session]}"
+                    f"<br>{SESSION_CLO[session]}<extra></extra>"
+                ),
+                showlegend=False,
+            )
+        )
+
+    bands = [
+        (0.5, 1.5, "#EAF3FB"),
+        (1.5, 2.5, "#E7F6F2"),
+        (2.5, 3.5, "#F2EAF7"),
+        (3.5, 4.5, "#F9ECE9"),
+    ]
+    for lower, upper, color in bands:
+        figure.add_hrect(y0=lower, y1=upper, fillcolor=color, line_width=0, layer="below")
+
+    figure.update_layout(
+        title="Course journey — 16 sessions across 4 modules",
+        xaxis={
+            "title": "Session number",
+            "tickvals": list(range(1, 17)),
+            "ticktext": [str(i) for i in range(1, 17)],
+        },
+        yaxis={
+            "title": "Module",
+            "tickvals": [1, 2, 3, 4],
+            "ticktext": ["M1: Foundations", "M2: Dashboard", "M3: Storytelling", "M4: Strategy"],
+        },
+        height=430,
+        plot_bgcolor="#FFFFFF",
+        margin={"t": 65, "r": 20, "b": 55, "l": 80},
+        hoverlabel={"font_size": 14},
+    )
+    st.plotly_chart(figure, use_container_width=True, config={"displaylogo": False})
+
+    callout_insight(
+        "The course is deliberately scaffolded: perceptual foundations → chart and dashboard design "
+        "→ narrative construction → strategic application. Later sessions assume earlier skills.",
+        "Scaffolded design",
+    )
+
+    flow_col, assessment_col = st.columns([1.1, 1])
+    with flow_col:
+        st.markdown("### Typical 75-minute session")
+        flow = [
+            ("0–5 min", "Warm-up and prior-session retrieval", SUCCESS),
+            ("5–20 min", "Concept explanation and discussion", PRIMARY),
+            ("20–40 min", "Live demonstration and guided exploration", "#6D3A8D"),
+            ("40–60 min", "Individual or group lab", WARNING),
+            ("60–70 min", "Critique and managerial interpretation", ACCENT),
+            ("70–75 min", "Quiz, reflection, and completion", DANGER),
+        ]
+        for time_range, activity, color in flow:
+            st.markdown(
+                f"""
+                <div style="display:flex;align-items:center;gap:.8rem;margin-bottom:.55rem;">
+                    <div style="background:{color};color:white;border-radius:.4rem;padding:.3rem .65rem;
+                                min-width:92px;text-align:center;font-weight:700;">{time_range}</div>
+                    <div>{escape(activity)}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with assessment_col:
+        st.markdown("### Assessment alignment")
+        assessment = pd.DataFrame(
+            {
+                "Component": [
+                    "In-class quizzes (5)",
+                    "Mini-labs (8)",
+                    "Business case analyses (3)",
+                    "Final visual-story project",
+                    "Class participation",
+                ],
+                "Weight": ["15%", "20%", "25%", "30%", "10%"],
+                "CLOs": ["CLO1–2", "CLO2–3", "CLO3–4", "CLO1–4", "All"],
+            }
+        )
+        st.dataframe(assessment, use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.markdown("### Open any session")
+    session_pages = st.session_state.get("_session_pages", {})
+    for module_number in range(1, 5):
+        with st.expander(MODULE_LABELS[module_number], expanded=module_number == 1):
+            module_sessions = [s for s in sessions if SESSION_MODULE[s] == module_number]
+            columns = st.columns(2)
+            for index, session in enumerate(module_sessions):
+                if session in session_pages:
+                    with columns[index % 2]:
+                        st.page_link(
+                            session_pages[session],
+                            label=f"Session {session}: {SESSION_TITLES[session]}",
+                            icon=":material/arrow_forward:",
+                            use_container_width=True,
+                        )
