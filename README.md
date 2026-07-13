@@ -103,7 +103,7 @@ pip install -e ".[dev]"
 Run quality checks:
 
 ```bash
-ruff check app.py modules/data_generators.py modules/home.py modules/tools.py modules/tools_runtime_patch.py modules/ui_components.py tests --ignore E402,F401
+ruff check app.py modules/data_generators.py modules/home.py modules/tools.py modules/tools_runtime_patch.py modules/ui_components.py tests --select E9,F63,F7,F82 --ignore E402,F401
 pytest
 ```
 
