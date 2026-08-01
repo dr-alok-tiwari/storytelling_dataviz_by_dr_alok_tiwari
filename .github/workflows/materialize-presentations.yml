@@ -1,0 +1,46 @@
+name: Materialize session presentations
+
+on:
+  push:
+    branches:
+      - feature/add-session-presentations
+    paths:
+      - '.github/workflows/materialize-presentations.yml'
+      - '.presentation_bootstrap/**'
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/add-session-presentations
+          fetch-depth: 0
+
+      - name: Reconstruct official PPTX assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d .presentation_bootstrap
+          cat .presentation_bootstrap/chunk_*.txt | base64 --decode | xz --decompress | tar --extract
+          test "$(find assets/session_ppts -maxdepth 1 -type f -name '*.pptx' | wc -l)" -eq 16
+          for file in assets/session_ppts/*.pptx; do
+            test -s "$file"
+            head -c 2 "$file" | grep -q 'PK'
+          done
+          rm -rf .presentation_bootstrap
+          rm -f .github/workflows/materialize-presentations.yml
+
+      - name: Commit reconstructed presentations
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add official PowerPoint resources for all 16 course sessions"
+          git push origin HEAD:feature/add-session-presentations
