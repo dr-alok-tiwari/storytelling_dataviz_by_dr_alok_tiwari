@@ -7,12 +7,19 @@ on:
     paths:
       - '.github/workflows/materialize-presentations.yml'
       - '.presentation_bootstrap/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/materialize-presentations.yml'
+      - '.presentation_bootstrap/**'
 
 permissions:
   contents: write
 
 jobs:
   materialize:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Check out feature branch
