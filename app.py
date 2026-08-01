@@ -18,6 +18,27 @@ st.set_page_config(
     },
 )
 
+# Patch the shared session header before importing legacy session modules. Their
+# ``from modules.ui_components import session_header`` statements then receive
+# this presentation-aware wrapper without duplicating code across 16 sessions.
+import modules.ui_components as ui_components
+from modules.session_resources import (
+    render_home_presentation_notice,
+    render_presentation_library,
+    render_session_presentation,
+)
+
+_original_session_header = ui_components.session_header
+
+
+def _session_header_with_presentation(session_number: int) -> None:
+    """Render the existing header followed by the matching official deck."""
+    _original_session_header(session_number)
+    render_session_presentation(session_number)
+
+
+ui_components.session_header = _session_header_with_presentation
+
 from modules.home import render_home, render_roadmap
 from modules.lazy_tabs import enable_lazy_tabs_for
 from modules.sessions_1_8 import (
@@ -51,7 +72,7 @@ from modules.tools_runtime_patch import install as install_tools_runtime_patch
 from modules.ui_components import footer, inject_css
 
 
-APP_VERSION = "2.0.1"
+APP_VERSION = "2.1.0"
 
 install_tools_runtime_patch()
 
@@ -114,6 +135,19 @@ install_tools_runtime_patch()
 )
 
 
+def _render_home_with_presentation_notice() -> None:
+    """Render the established home page and a compact presentation notice."""
+    render_home()
+    resources_page = st.session_state.get("_tool_pages", {}).get("resources")
+    render_home_presentation_notice(resources_page)
+
+
+def _render_resources_with_presentations() -> None:
+    """Extend the existing resources page with the official deck library."""
+    render_resources()
+    render_presentation_library()
+
+
 def _session_4_with_correction() -> None:
     """Render Session 4 with an explicit correction to the legacy palette exercise."""
     st.info(
@@ -141,7 +175,7 @@ def _initialise_state() -> None:
 _initialise_state()
 
 home_page = st.Page(
-    render_home,
+    _render_home_with_presentation_notice,
     title="Home",
     icon=":material/home:",
     default=True,
@@ -198,7 +232,7 @@ tool_pages = {
         url_path="quiz-zone",
     ),
     "resources": st.Page(
-        render_resources,
+        _render_resources_with_presentations,
         title="Resources & tools",
         icon=":material/construction:",
         url_path="resources",
